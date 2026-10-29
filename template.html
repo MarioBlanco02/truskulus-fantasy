@@ -226,8 +226,10 @@ const POINTS = {juega:2, gol:4, golDEF:2, golPOR:4, asist:3, porteria:3, mvp:3, 
 const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (POR/DEF)","+3"],["MVP (el más votado)","+3"],["2.º más votado","+2"],["3.º más votado","+1"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
 const POS = {POR:"Portero",DEF:"Defensa",MED:"Medio",DEL:"Delantero"};
 const FORMS = {"2-3-1":{DEF:2,MED:3,DEL:1},"3-2-1":{DEF:3,MED:2,DEL:1},"2-2-2":{DEF:2,MED:2,DEL:2},"3-1-2":{DEF:3,MED:1,DEL:2},"1-3-2":{DEF:1,MED:3,DEL:2}};
-// Posiciones provisionales hasta que cada jugador elija la suya (la liga no publica posiciones)
-const DEFPOS = {50209:"DEL",9003:"DEF",8889:"DEF",8765:"MED",10567:"DEF",8999:"MED",7060:"DEL",9005:"MED",9001:"DEL",9006:"DEL",9000:"MED",8998:"POR",8997:"POR",9002:"DEF"};
+// Posición habitual (cuenta para la puntuación). En el campo cualquiera puede jugar en cualquier hueco, salvo el portero fijo.
+const DEFPOS = {50209:"MED",9003:"POR",8889:"DEF",8765:"MED",10567:"DEF",8999:"MED",7060:"DEL",9005:"MED",9001:"DEL",9006:"DEL",9000:"MED",8998:"MED",8997:"MED",9002:"DEF"};
+const GK_ONLY = [9003];            // Arturo: solo puede ir de portero
+const INJURED = [9003];            // lesionados: no se pueden elegir (se cambia aquí y se publica)
 
 /* ── Utilidades ── */
 const sum = a=>a.reduce((x,y)=>x+y,0);
@@ -321,7 +323,8 @@ function scoreOf(p,m){
 function compute(){
   EVMAP={}; EVENTS.forEach(e=>{EVMAP[e.jornada+":"+e.player_id+":"+e.kind]=e.qty});
   P.forEach(p=>{
-    p.pos=S.pos[p.id]||DEFPOS[p.id]||"MED";
+    p.pos=GK_ONLY.includes(p.id)?"POR":(S.pos[p.id]||DEFPOS[p.id]||"MED");
+    p.hurt=INJURED.includes(p.id);
     p.log=PLAYED.map(m=>({m,...scoreOf(p,m)}));
     // valor de mercado: sube o baja con cada partido jugado, también J2 y J3
     let v=VALUE0; p.hist=[VALUE0];
@@ -344,8 +347,11 @@ const faceOf=(p,fb)=>{const u=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]);ret
 /* ── Alineación ── */
 function slotPlan(){const f=FORMS[S.form];return ["POR",...Array(f.DEF).fill("DEF"),...Array(f.MED).fill("MED"),...Array(f.DEL).fill("DEL")]}
 function reconcile(){
-  const plan=slotPlan(), old=S.slots.filter(Boolean).map(byId).filter(Boolean), used=new Set(), out=plan.map(()=>null);
-  plan.forEach((pos,i)=>{const c=old.find(p=>p.pos===pos&&!used.has(p.id)); if(c){out[i]=c.id;used.add(c.id)}});
+  const seen=new Set(), out=slotPlan().map((pos,i)=>{
+    const id=S.slots[i], p=id&&byId(id);
+    if(!p||p.hurt||seen.has(id)||(GK_ONLY.includes(id)&&pos!=="POR")) return null;
+    seen.add(id); return id;
+  });
   S.slots=out; if(!out.includes(S.cap)) S.cap=null;
 }
 const spent=()=>sum(S.slots.filter(Boolean).map(id=>byId(id).value));
@@ -435,7 +441,7 @@ function viewLineup(){
       <div style="display:flex;gap:8px">${S.locked?`<button class="btn ghost" data-act="unlock" ${closed()?"disabled":""}>Editar</button>`:`<button class="btn ghost" data-act="clear" ${filled()?"":"disabled"}>Vaciar</button><button class="btn" data-act="lock" ${valid()&&!closed()?"":"disabled"}>Confirmar 7</button>`}</div>
     </div>
   </section>
-  <p class="note">Cada hueco pide su posición. Si no tienes jugadores de una posición, asígnalos en Mercado. Puedes editar hasta el inicio del partido.</p>`;
+  <p class="note">En cada hueco puede jugar cualquiera, salvo Arturo, que solo es portero (ahora lesionado). La posición habitual de cada jugador decide cómo puntúa. Puedes editar hasta el inicio del partido.</p>`;
 }
 function viewMarket(){
   let r=P.filter(p=>mfilter==="ALL"||p.pos===mfilter);
@@ -446,7 +452,7 @@ function viewMarket(){
     <div class="chipsel" style="gap:6px">${[["value","Valor"],["form","Racha"],["pts","Puntos"]].map(([k,l])=>`<button data-ms="${k}" aria-pressed="${msort===k}" style="padding:5px 10px;font-size:12px">${l}</button>`).join("")}</div></div>
    <div class="list">${r.map(p=>`<button class="row" data-player="${p.id}">
      <div class="av">${faceOf(p,p.num)}</div>
-     <div class="grow"><b>${p.n} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">${posPill(p.pos)} ${p.pj} PJ · ${p.j.goles} G</span></div>
+     <div class="grow"><b>${p.n} ${p.hurt?'<span class="posdot" style="background:var(--warn)">LESIONADO</span>':""} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">${posPill(p.pos)} ${p.pj} PJ · ${p.j.goles} G</span></div>
      ${spark(p.hist)}
      <div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
   <p class="note">El valor de cada jugador sube o baja tras cada partido según su rendimiento. Toca un jugador para ver su ficha, cambiar su posición y subir su foto.</p>`;
@@ -527,7 +533,7 @@ function profile(id){
   return `<div class="grab"></div><div class="profile">
     ${canEdit(p)?`<label class="avbtn"><div class="av bigav">${faceOf(p,p.num)}</div><span class="cam">Cambiar foto</span><input type="file" accept="image/*" data-photo="${p.id}" aria-label="Foto de ${p.n}"></label>`:`<div class="av bigav">${faceOf(p,p.num)}</div>`}
     <div><h2>${p.full}</h2><div class="sub">${p.n} · #${p.num}${p.hot?" · en racha":""}</div></div>
-    ${canEdit(p)?`<div class="chipsel" role="group" aria-label="Posición">${Object.keys(POS).map(k=>`<button data-setpos="${p.id}:${k}" aria-pressed="${p.pos===k}">${POS[k]}</button>`).join("")}</div>`:posPill(p.pos)}
+    ${GK_ONLY.includes(p.id)?`<div class="sub">Portero fijo${p.hurt?" · lesionado, no se puede elegir":""}</div>`:canEdit(p)?`<div class="sub" style="margin-bottom:-6px">Posición habitual (cuenta para la puntuación). En tu 7 puede ir en cualquier hueco.</div><div class="chipsel" role="group" aria-label="Posición">${Object.keys(POS).map(k=>`<button data-setpos="${p.id}:${k}" aria-pressed="${p.pos===k}">${POS[k]}</button>`).join("")}</div>`:posPill(p.pos)}${p.hurt&&!GK_ONLY.includes(p.id)?'<div class="sub neg">Lesionado</div>':""}
     <div class="stats"><div class="stat"><b>${money(p.value)}</b><span class="sub">Valor</span></div><div class="stat"><b>${p.pj}</b><span class="sub">Partidos</span></div><div class="stat"><b>${p.j.goles}</b><span class="sub">Goles</span></div><div class="stat"><b>${p.j.asistencias}</b><span class="sub">Asist.</span></div></div>
     <div style="width:100%;text-align:left"><div class="eyebrow">Evolución del valor</div>${spark(p.hist,"bigspark",300,80)}<div class="sub">Desde ${money(VALUE0)} · <span class="${up>=0?"":"neg"}">${fmt(+up.toFixed(1))} M€</span></div></div>
     <div style="width:100%;text-align:left" class="list">${p.log.map(x=>`<div class="row" style="padding:10px 0"><div class="grow"><b>J${x.m.jornada} · ${x.m.esLocal?x.m.visitante:x.m.local}</b><div class="chips">${x.ev.map(e=>`<span class="chip">${e}</span>`).join("")}${x.ausente?'<span class="chip neg">No se presentó</span>':""}</div></div><div class="val"><div class="pts ${x.pts<0?"neg":""}">${fmt(x.pts)}</div>${deltaHtml(x.delta)}</div></div>`).join("")||'<p class="sub">Aún sin partidos.</p>'}</div>
@@ -536,11 +542,12 @@ function profile(id){
 }
 function pickSheet(i){
   const pos=slotPlan()[i], used=new Set(S.slots.filter((x,j)=>x&&j!==i)), room=BUDGET-(spent()-(S.slots[i]?byId(S.slots[i]).value:0));
-  const list=P.filter(p=>p.pos===pos).sort((a,b)=>b.value-a.value);
+  const why=p=>p.hurt?"Lesionado":(GK_ONLY.includes(p.id)&&pos!=="POR")?"Solo portero":used.has(p.id)?"Ya en tu 7":p.value>room+1e-9?"No cabe":"";
+  const list=[...P].sort((a,b)=>b.value-a.value);
   return `<div class="grab"></div><div class="sec"><h2>Elige tu ${POS[pos].toLowerCase()}</h2><span class="sub">Te quedan ${money(Math.max(0,room))} · <button data-act="close" style="color:var(--accent);font-weight:700">Cerrar</button></span></div>
-   <div class="list">${list.map(p=>{const no=used.has(p.id)||p.value>room+1e-9;return `<button class="row" data-pick="${p.id}" ${no?"disabled":""}>
-     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub">${p.pj} PJ · media ${p.avg.toFixed(1)} pts${p.value>room+1e-9?" · no cabe":""}</span></div>
-     ${spark(p.hist)}<div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`}).join("")||'<p class="sub" style="padding:16px">Nadie juega de '+POS[pos].toLowerCase()+'. Asigna posiciones en Mercado.</p>'}
+   <div class="list">${list.map(p=>{const no=why(p);return `<button class="row" data-pick="${p.id}" ${no?"disabled":""}>
+     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub" style="white-space:nowrap">${posPill(p.pos)} ${no?no:p.pj+" PJ · media "+p.avg.toFixed(1)+" pts"}</span></div>
+     ${spark(p.hist)}<div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`}).join("")}
    ${S.slots[i]?'<button class="row" data-pick="0"><div class="grow"><b class="neg">Quitar jugador</b></div></button>':""}</div>`;
 }
 
