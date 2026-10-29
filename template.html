@@ -223,13 +223,12 @@ const BUDGET = 34;                 // M€ para el 7 inicial
 const VALUE0 = 5.0, VALUE_MIN = 1.0, VALUE_MAX = 25;
 const MVP_BONUS = [3,2,1];          // 1.º, 2.º y 3.º más votados del partido
 const POINTS = {juega:2, gol:4, golDEF:2, golPOR:4, asist:3, porteria:3, mvp:3, amarilla:-1, roja:-3, ausente:-3};
-const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (POR/DEF)","+3"],["MVP (el más votado)","+3"],["2.º más votado","+2"],["3.º más votado","+1"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
+const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol jugando de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (de POR o DEF)","+3"],["MVP (el más votado)","+3"],["2.º más votado","+2"],["3.º más votado","+1"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
 const POS = {POR:"Portero",DEF:"Defensa",MED:"Medio",DEL:"Delantero"};
 const FORMS = {"2-3-1":{DEF:2,MED:3,DEL:1},"3-2-1":{DEF:3,MED:2,DEL:1},"2-2-2":{DEF:2,MED:2,DEL:2},"3-1-2":{DEF:3,MED:1,DEL:2},"1-3-2":{DEF:1,MED:3,DEL:2}};
-// Posición habitual (cuenta para la puntuación). En el campo cualquiera puede jugar en cualquier hueco, salvo el portero fijo.
-const DEFPOS = {50209:"MED",9003:"POR",8889:"DEF",8765:"MED",10567:"DEF",8999:"MED",7060:"DEL",9005:"MED",9001:"DEL",9006:"DEL",9000:"MED",8998:"MED",8997:"MED",9002:"DEF"};
+// En tu 7 cualquiera puede jugar en cualquier hueco; la posición cuenta según el hueco donde lo pongas.
 const GK_ONLY = [9003];            // Arturo: solo puede ir de portero
-const INJURED = [9003];            // lesionados: no se pueden elegir (se cambia aquí y se publica)
+const INJ_DEFAULT = [{player_id:9003,since:2,until:null}];   // Arturo, lesionado; en modo equipo se guarda en Supabase
 
 /* ── Utilidades ── */
 const sum = a=>a.reduce((x,y)=>x+y,0);
@@ -256,7 +255,8 @@ function persist(){
   if(CLOUD){clearTimeout(saveTimer);saveTimer=setTimeout(saveLineup,500);return}
   try{localStorage.setItem("ft2",JSON.stringify(S))}catch(e){}
 }
-let EVENTS=S.events||[], VOTES=S.votes||[], EVMAP={}, JK={};
+let EVENTS=S.events||[], VOTES=S.votes||[], EVMAP={}, JK={}, INJ=S.injuries||INJ_DEFAULT;
+const injuredAt=(pid,j)=>INJ.some(r=>r.player_id===pid&&j>=r.since&&(r.until==null||j<=r.until));
 const LOCAL_ME={id:"local",player_id:null};
 const meRow=()=>CLOUD?ME:LOCAL_ME;
 const myPlayerId=()=>CLOUD?(ME&&ME.player_id):null;
@@ -306,38 +306,42 @@ function countdown(){
 const P = DATA.jugadores.map(j=>({id:j.userId,n:short(j),full:j.nombre+" "+j.apellido,num:j.dorsal,j}));
 function scoreOf(p,m){
   const r=(DATA.estadisticas[m.matchId]||[]).find(x=>x.userId===p.id);
-  if(!r||!r.jugo) return {pts:POINTS.ausente,ev:[],ausente:true};
+  if(!r||!r.jugo) return injuredAt(p.id,m.jornada)?{pts:0,ev:["Lesionado"],ausente:false,lesion:true}:{pts:POINTS.ausente,ev:[],ausente:true};
   const conc=m.esLocal?m.golesVisitante:m.golesLocal;
   const ov=k=>EVMAP[m.jornada+":"+p.id+":"+k];
   const asist=ov("asist")??r.asistencias, amar=ov("amarilla")??r.amarillas, roja=ov("roja")??r.rojas;
   const vb=voteBonus(m.jornada), vv=vb?vb.get(p.id):(r.mvp?{bonus:MVP_BONUS[0],lugar:1}:null);
   let pts=POINTS.juega, ev=[];
-  if(r.goles){pts+=r.goles*(POINTS.gol+(p.pos==="DEF"?POINTS.golDEF:p.pos==="POR"?POINTS.golPOR:0));ev.push(r.goles+(r.goles>1?" goles":" gol"))}
+  if(r.goles){pts+=r.goles*POINTS.gol;ev.push(r.goles+(r.goles>1?" goles":" gol"))}
   if(asist){pts+=asist*POINTS.asist;ev.push(asist+" asist.")}
-  if((p.pos==="POR"||p.pos==="DEF")&&conc===0){pts+=POINTS.porteria;ev.push("Portería a cero")}
   if(vv){pts+=vv.bonus;ev.push(vv.lugar===1?"MVP":vv.lugar+".º más votado")}
   if(amar){pts+=amar*POINTS.amarilla;ev.push(amar+" amarilla"+(amar>1?"s":""))}
   if(roja){pts+=roja*POINTS.roja;ev.push(roja>1?roja+" rojas":"Roja")}
-  return {pts,ev,ausente:false};
+  return {pts,ev,ausente:false,goles:r.goles,cs:conc===0};
+}
+// Bonus por el hueco en que el compañero coloca al jugador: gol de defensa/portero y portería a cero
+function slotBonus(x,pos){
+  if(!x||x.ausente||x.lesion) return 0;
+  return (pos==="DEF"?x.goles*POINTS.golDEF:pos==="POR"?x.goles*POINTS.golPOR:0)+((pos==="POR"||pos==="DEF")&&x.cs?POINTS.porteria:0);
 }
 function compute(){
   EVMAP={}; EVENTS.forEach(e=>{EVMAP[e.jornada+":"+e.player_id+":"+e.kind]=e.qty});
   P.forEach(p=>{
-    p.pos=GK_ONLY.includes(p.id)?"POR":(S.pos[p.id]||DEFPOS[p.id]||"MED");
-    p.hurt=INJURED.includes(p.id);
+    p.hurt=injuredAt(p.id,NEXT.jornada);
     p.log=PLAYED.map(m=>({m,...scoreOf(p,m)}));
     // valor de mercado: sube o baja con cada partido jugado, también J2 y J3
     let v=VALUE0; p.hist=[VALUE0];
     p.log.forEach(x=>{
-      x.delta=x.ausente?-0.5:clamp((x.pts-3)*0.25,-1.5,2.5);
+      x.delta=x.lesion?0:x.ausente?-0.5:clamp((x.pts-3)*0.25,-1.5,2.5);
       v=clamp(Math.round((v+x.delta)*10)/10,VALUE_MIN,VALUE_MAX); x.value=v; p.hist.push(v);
     });
     p.value=v; p.lastDelta=p.log.length?p.log[p.log.length-1].delta:0;
     const count=p.log.filter(x=>x.m.jornada>=START_JORNADA);
     p.fant=sum(count.map(x=>x.pts));            // puntos del fantasy (desde la J4)
     const pre=p.log.filter(x=>x.m.jornada<START_JORNADA);
-    p.pre=sum(pre.map(x=>x.pts)); p.avg=pre.length?p.pre/pre.length:0;
-    p.pj=p.log.filter(x=>!x.ausente).length;
+    const pre2=pre.filter(x=>!x.lesion);
+    p.pre=sum(pre.map(x=>x.pts)); p.avg=pre2.length?sum(pre2.map(x=>x.pts))/pre2.length:0;
+    p.pj=p.log.filter(x=>!x.ausente&&!x.lesion).length;
     p.hot=p.log.slice(-2).filter(x=>x.pts>=6).length===2;
   });
 }
@@ -345,7 +349,8 @@ const byId=id=>P.find(p=>p.id===id);
 const faceOf=(p,fb)=>{const u=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]);return u?`<img src="${u}" alt="${p.n}">`:fb};
 
 /* ── Alineación ── */
-function slotPlan(){const f=FORMS[S.form];return ["POR",...Array(f.DEF).fill("DEF"),...Array(f.MED).fill("MED"),...Array(f.DEL).fill("DEL")]}
+const planFor=fm=>{const f=FORMS[fm];return ["POR",...Array(f.DEF).fill("DEF"),...Array(f.MED).fill("MED"),...Array(f.DEL).fill("DEL")]};
+const slotPlan=()=>planFor(S.form);
 function reconcile(){
   const seen=new Set(), out=slotPlan().map((pos,i)=>{
     const id=S.slots[i], p=id&&byId(id);
@@ -441,21 +446,21 @@ function viewLineup(){
       <div style="display:flex;gap:8px">${S.locked?`<button class="btn ghost" data-act="unlock" ${closed()?"disabled":""}>Editar</button>`:`<button class="btn ghost" data-act="clear" ${filled()?"":"disabled"}>Vaciar</button><button class="btn" data-act="lock" ${valid()&&!closed()?"":"disabled"}>Confirmar 7</button>`}</div>
     </div>
   </section>
-  <p class="note">En cada hueco puede jugar cualquiera, salvo Arturo, que solo es portero (ahora lesionado). La posición habitual de cada jugador decide cómo puntúa. Puedes editar hasta el inicio del partido.</p>`;
+  <p class="note">En cada hueco puede jugar cualquiera, salvo Arturo, que solo es portero. La posición cuenta según el hueco donde pongas al jugador: gol de defensa +2 extra, de portero +4, y portería a cero +3 para portero y defensas. Puedes editar hasta el inicio del partido.</p>`;
 }
 function viewMarket(){
-  let r=P.filter(p=>mfilter==="ALL"||p.pos===mfilter);
+  let r=P.filter(p=>mfilter==="ALL"||(mfilter==="HURT"?p.hurt:!p.hurt));
   const key={value:p=>p.value,form:p=>p.lastDelta,pts:p=>p.pre}[msort];
   r=[...r].sort((a,b)=>key(b)-key(a));
-  return `<div class="glass seg" role="group" aria-label="Posición">${[["ALL","Todos"],...Object.keys(POS).map(k=>[k,k])].map(([k,l])=>`<button data-mf="${k}" aria-pressed="${mfilter===k}">${l}</button>`).join("")}</div>
+  return `<div class="glass seg" role="group" aria-label="Filtro">${[["ALL","Todos"],["OK","Disponibles"],["HURT","Lesionados"]].map(([k,l])=>`<button data-mf="${k}" aria-pressed="${mfilter===k}">${l}</button>`).join("")}</div>
   <section class="glass"><div class="sec"><h2>Mercado</h2>
     <div class="chipsel" style="gap:6px">${[["value","Valor"],["form","Racha"],["pts","Puntos"]].map(([k,l])=>`<button data-ms="${k}" aria-pressed="${msort===k}" style="padding:5px 10px;font-size:12px">${l}</button>`).join("")}</div></div>
    <div class="list">${r.map(p=>`<button class="row" data-player="${p.id}">
      <div class="av">${faceOf(p,p.num)}</div>
-     <div class="grow"><b>${p.n} ${p.hurt?'<span class="posdot" style="background:var(--warn)">LESIONADO</span>':""} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">${posPill(p.pos)} ${p.pj} PJ · ${p.j.goles} G</span></div>
+     <div class="grow"><b>${p.n} ${p.hurt?'<span class="posdot" style="background:var(--warn)">LESIONADO</span>':""} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">#${p.num} · ${p.pj} PJ · ${p.j.goles} G</span></div>
      ${spark(p.hist)}
      <div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
-  <p class="note">El valor de cada jugador sube o baja tras cada partido según su rendimiento. Toca un jugador para ver su ficha, cambiar su posición y subir su foto.</p>`;
+  <p class="note">El valor de cada jugador sube o baja tras cada partido según su rendimiento. Toca un jugador para ver su ficha, marcarlo como lesionado o cambiar su foto.</p>`;
 }
 const playedIds=m=>P.filter(p=>{const r=(DATA.estadisticas[m.matchId]||[]).find(x=>x.userId===p.id);return r&&r.jugo});
 const fmtClose=j=>new Date(kickoffOf(j)+VOTE_DAYS*864e5).toLocaleDateString("es-ES",{weekday:"long",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Madrid"});
@@ -495,7 +500,7 @@ function matchLog(m){
   ${eventsPanel(m)}
   <section class="glass"><div class="sec"><h2>Rendimiento</h2><span class="eyebrow">Jornada ${m.jornada}</span></div>
    <div class="list">${rows.map(({p,ev,pts,ausente,delta})=>`<button class="row" data-player="${p.id}"><div class="av">${faceOf(p,p.num)}</div>
-     <div class="grow"><b>${p.n}</b><div class="chips">${posPill(p.pos)}${ev.map(e=>`<span class="chip ${/amarilla|Roja/.test(e)?"neg":""}">${e}</span>`).join("")}${ausente?'<span class="chip neg">No se presentó</span>':""}</div></div>
+     <div class="grow"><b>${p.n}</b><div class="chips">${ev.map(e=>`<span class="chip ${/amarilla|Roja/.test(e)?"neg":""}">${e}</span>`).join("")}${ausente?'<span class="chip neg">No se presentó</span>':""}</div></div>
      <div class="val"><div class="pts ${pts<0?"neg":""}" style="${counts?"":"opacity:.55"}">${fmt(pts)}</div>${deltaHtml(delta)}</div></button>`).join("")}</div></section>`;
 }
 function viewRank(){
@@ -513,7 +518,7 @@ function viewRank(){
   return seg+(cloudBoard||`<section class="glass empty"><div class="eyebrow">Clasificación del fantasy</div><h2>Todos a cero</h2>
     <p class="sub" style="margin:0;max-width:30ch">Los puntos empiezan a contar en la Jornada ${START_JORNADA}. Confirma tu 7 antes del partido para entrar en la tabla.</p></section>`)+`
   <section class="glass"><div class="sec"><h2>Los más caros</h2><span class="eyebrow">Valor de mercado</span></div>
-   <div class="list">${rich.map((p,i)=>`<button class="row" data-player="${p.id}"><span class="rank ${i<3?"top3":""}">${i+1}</span><div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub">${posPill(p.pos)}</span></div><div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
+   <div class="list">${rich.map((p,i)=>`<button class="row" data-player="${p.id}"><span class="rank ${i<3?"top3":""}">${i+1}</span><div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub">#${p.num}</span></div><div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
   <section class="glass"><div class="sec"><h2>Pretemporada</h2><span class="eyebrow">J2 y J3 · no suma</span></div>
    <div class="list">${pre.map((p,i)=>`<button class="row" data-player="${p.id}"><span class="rank ${i<3?"top3":""}">${i+1}</span><div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub">${p.log.map(x=>fmt(x.pts)).join("  ")}</span></div><div class="pts">${p.pre}</div></button>`).join("")}</div></section>`;
 }
@@ -528,15 +533,25 @@ function viewLiga(){
    ${t.map(x=>`<tr class="${x.id===TEAM_ID?"me":""}"><td>${x.pos}</td><td><span class="tn">${crest(x.id,x.nombre,26)}<span>${x.nombre}</span></span></td><td>${x.pj}</td><td>${fmt(x.gf-x.gc)}</td><td><b>${x.pts}</b></td></tr>`).join("")}</tbody></table></div></section>
   <section class="glass"><div class="sec"><h2>Calendario</h2><span class="eyebrow">Truskulus FC</span></div>${ms.map(row).join("")}</section>`;
 }
+function injuryBox(p){
+  const cur=INJ.find(r=>r.player_id===p.id&&r.until==null);
+  if(cur) return `<div class="glass card" style="width:100%;text-align:left"><b class="neg">Lesionado desde la J${cur.since}</b>
+    <div class="sub">Si no se presenta, no resta puntos ni valor de mercado, y no se puede elegir para tu 7.</div>
+    <button class="btn ghost" data-heal="${p.id}">Marcar como recuperado</button></div>`;
+  const opts=[...new Set([...PLAYED.map(m=>m.jornada),NEXT.jornada])].sort((a,b)=>a-b).map(j=>`<option value="${j}" ${j===NEXT.jornada?"selected":""}>Desde la J${j}${j===NEXT.jornada?" (próximo partido)":""}</option>`).join("");
+  return `<div style="width:100%;display:grid;gap:8px"><select class="sel" id="inj-from" aria-label="Lesionado desde">${opts}</select>
+    <button class="btn ghost" data-injure="${p.id}">Marcar como lesionado</button></div>`;
+}
 function profile(id){
   const p=byId(id), up=p.value-VALUE0;
   return `<div class="grab"></div><div class="profile">
     ${canEdit(p)?`<label class="avbtn"><div class="av bigav">${faceOf(p,p.num)}</div><span class="cam">Cambiar foto</span><input type="file" accept="image/*" data-photo="${p.id}" aria-label="Foto de ${p.n}"></label>`:`<div class="av bigav">${faceOf(p,p.num)}</div>`}
     <div><h2>${p.full}</h2><div class="sub">${p.n} · #${p.num}${p.hot?" · en racha":""}</div></div>
-    ${GK_ONLY.includes(p.id)?`<div class="sub">Portero fijo${p.hurt?" · lesionado, no se puede elegir":""}</div>`:canEdit(p)?`<div class="sub" style="margin-bottom:-6px">Posición habitual (cuenta para la puntuación). En tu 7 puede ir en cualquier hueco.</div><div class="chipsel" role="group" aria-label="Posición">${Object.keys(POS).map(k=>`<button data-setpos="${p.id}:${k}" aria-pressed="${p.pos===k}">${POS[k]}</button>`).join("")}</div>`:posPill(p.pos)}${p.hurt&&!GK_ONLY.includes(p.id)?'<div class="sub neg">Lesionado</div>':""}
+    ${GK_ONLY.includes(p.id)?'<div class="sub">Portero fijo: solo puede jugar de portero</div>':""}
+    ${injuryBox(p)}
     <div class="stats"><div class="stat"><b>${money(p.value)}</b><span class="sub">Valor</span></div><div class="stat"><b>${p.pj}</b><span class="sub">Partidos</span></div><div class="stat"><b>${p.j.goles}</b><span class="sub">Goles</span></div><div class="stat"><b>${p.j.asistencias}</b><span class="sub">Asist.</span></div></div>
     <div style="width:100%;text-align:left"><div class="eyebrow">Evolución del valor</div>${spark(p.hist,"bigspark",300,80)}<div class="sub">Desde ${money(VALUE0)} · <span class="${up>=0?"":"neg"}">${fmt(+up.toFixed(1))} M€</span></div></div>
-    <div style="width:100%;text-align:left" class="list">${p.log.map(x=>`<div class="row" style="padding:10px 0"><div class="grow"><b>J${x.m.jornada} · ${x.m.esLocal?x.m.visitante:x.m.local}</b><div class="chips">${x.ev.map(e=>`<span class="chip">${e}</span>`).join("")}${x.ausente?'<span class="chip neg">No se presentó</span>':""}</div></div><div class="val"><div class="pts ${x.pts<0?"neg":""}">${fmt(x.pts)}</div>${deltaHtml(x.delta)}</div></div>`).join("")||'<p class="sub">Aún sin partidos.</p>'}</div>
+    <div style="width:100%;text-align:left" class="list">${p.log.map(x=>`<div class="row" style="padding:10px 0"><div class="grow"><b>J${x.m.jornada} · ${x.m.esLocal?x.m.visitante:x.m.local}</b><div class="chips">${x.ev.map(e=>`<span class="chip ${e==="Lesionado"?"neg":""}">${e}</span>`).join("")}${x.ausente?'<span class="chip neg">No se presentó</span>':""}</div></div><div class="val"><div class="pts ${x.pts<0?"neg":""}">${fmt(x.pts)}</div>${deltaHtml(x.delta)}</div></div>`).join("")||'<p class="sub">Aún sin partidos.</p>'}</div>
     ${CLOUD&&ME&&ME.player_id===p.id?'<button class="btn ghost" data-act="logout" style="width:100%">Cerrar sesión</button>':""}
     <button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`;
 }
@@ -546,7 +561,7 @@ function pickSheet(i){
   const list=[...P].sort((a,b)=>b.value-a.value);
   return `<div class="grab"></div><div class="sec"><h2>Elige tu ${POS[pos].toLowerCase()}</h2><span class="sub">Te quedan ${money(Math.max(0,room))} · <button data-act="close" style="color:var(--accent);font-weight:700">Cerrar</button></span></div>
    <div class="list">${list.map(p=>{const no=why(p);return `<button class="row" data-pick="${p.id}" ${no?"disabled":""}>
-     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub" style="white-space:nowrap">${posPill(p.pos)} ${no?no:p.pj+" PJ · media "+p.avg.toFixed(1)+" pts"}</span></div>
+     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub" style="white-space:nowrap">${no?no:"#"+p.num+" · "+p.pj+" PJ · media "+p.avg.toFixed(1)+" pts"}</span></div>
      ${spark(p.hist)}<div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`}).join("")}
    ${S.slots[i]?'<button class="row" data-pick="0"><div class="grow"><b class="neg">Quitar jugador</b></div></button>':""}</div>`;
 }
@@ -575,12 +590,13 @@ document.addEventListener("change",e=>{
   });
 });
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-ev],[data-gotovote],[data-form],[data-cap],[data-mf],[data-ms],[data-rv],[data-player],[data-setpos]"); if(!t)return;
+  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-ev],[data-gotovote],[data-form],[data-cap],[data-injure],[data-heal],[data-mf],[data-ms],[data-rv],[data-player]"); if(!t)return;
   const d=t.dataset;
   if(d.act==="close"){ if(t.classList.contains("scrim")&&e.target.closest(".sheet"))return; sheet(""); return }
   if(d.tab){tab=d.tab;sheet("");render();window.scrollTo(0,0)}
   else if(d.player){sheet(profile(+d.player))}
-  else if(d.setpos){setPos(...d.setpos.split(":"))}
+  else if(d.injure){setInjury(+d.injure,true)}
+  else if(d.heal){setInjury(+d.heal,false)}
   else if(d.slot!==undefined&&!t.disabled){pickIdx=+d.slot;sheet(pickSheet(pickIdx))}
   else if(d.pick!==undefined&&!t.disabled){S.slots[pickIdx]=+d.pick||null;if(!S.slots.includes(S.cap))S.cap=null;persist();sheet("");render()}
   else if(d.form&&!t.disabled){S.form=d.form;reconcile();persist();render()}
@@ -621,9 +637,18 @@ async function sendVote(){
   if(!CLOUD)persistLocal();
   toast("Voto guardado");compute();render();
 }
-async function setPos(id,pos){
-  if(CLOUD){const{error}=await sb.from("members").update({pos}).eq("id",ME.id);if(error){toast("No se pudo guardar la posición");return}ME.pos=pos}
-  S.pos[id]=pos;compute();reconcile();persist();render();sheet(profile(+id));
+async function setInjury(pid,on){
+  if(on){
+    const since=+document.getElementById("inj-from").value, row={player_id:pid,since,until:null};
+    if(CLOUD){const{error}=await sb.from("injuries").insert({...row,set_by:ME.id});if(error){toast("No se pudo guardar");return}}
+    INJ=INJ.filter(r=>!(r.player_id===pid&&r.since===since)); INJ.push(row);
+  }else{
+    const until=NEXT.jornada-1;
+    if(CLOUD){const{error}=await sb.from("injuries").update({until}).eq("player_id",pid).is("until",null);if(error){toast("No se pudo guardar");return}}
+    INJ.forEach(r=>{if(r.player_id===pid&&r.until==null)r.until=until});
+  }
+  if(!CLOUD){S.injuries=INJ;persist()}
+  compute();reconcile();persist();render();sheet(profile(pid));toast(on?"Marcado como lesionado":"Marcado como recuperado");
 }
 function viewLogin(){
   if(booting) return `<section class="glass empty"><h2>Cargando…</h2></section>`;
@@ -656,13 +681,14 @@ document.addEventListener("submit",async e=>{
 });
 async function logout(){await sb.auth.signOut();ME=null;S.slots=[];S.cap=null;S.locked=false;CLAIMED=(await sb.rpc("claimed_players")).data||[];sheet("");render()}
 async function loadCloud(){
-  const[ms,js,ls,u,evs,vts]=await Promise.all([sb.from("members").select("id,player_id,pos,photo"),sb.from("jornadas").select("jornada,kickoff"),
+  const[ms,js,ls,u,evs,vts,inj]=await Promise.all([sb.from("members").select("id,player_id,pos,photo"),sb.from("jornadas").select("jornada,kickoff"),
     sb.from("lineups").select("member_id,jornada,formation,slots,captain,confirmed"),sb.auth.getUser(),
-    sb.from("events").select("jornada,player_id,kind,qty,by_member"),sb.from("votes").select("jornada,voter,first,second,third")]);
-  EVENTS=evs.data||[]; VOTES=vts.data||[]; JK={}; (js.data||[]).forEach(j=>{JK[j.jornada]=new Date(j.kickoff).getTime()});
+    sb.from("events").select("jornada,player_id,kind,qty,by_member"),sb.from("votes").select("jornada,voter,first,second,third"),
+    sb.from("injuries").select("player_id,since,until")]);
+  EVENTS=evs.data||[]; VOTES=vts.data||[]; INJ=inj.data||[]; JK={}; (js.data||[]).forEach(j=>{JK[j.jornada]=new Date(j.kickoff).getTime()});
   MEMBERS=ms.data||[]; LINEUPS=(ls.data||[]).map(l=>({...l,slots:(l.slots||[]).map(x=>x||null)}));
   const k=(js.data||[]).find(j=>j.jornada===NEXT.jornada); if(k){NEXT.when=new Date(k.kickoff);NEXT.horaOk=true}
-  S.pos={};S.photos={}; MEMBERS.forEach(m=>{if(m.pos)S.pos[m.player_id]=m.pos;if(m.photo)S.photos[m.player_id]=m.photo});
+  S.photos={}; MEMBERS.forEach(m=>{if(m.photo)S.photos[m.player_id]=m.photo});
   const uid=u.data&&u.data.user&&u.data.user.id; ME=MEMBERS.find(m=>m.id===uid)||null;
   const mine=LINEUPS.find(l=>l.member_id===uid&&l.jornada===NEXT.jornada);
   if(mine){S.form=mine.formation;S.slots=mine.slots;S.cap=mine.captain||null;S.locked=!!mine.confirmed}
@@ -676,7 +702,8 @@ async function saveLineup(){
 }
 function lineupPoints(l){
   const m=PLAYED.find(x=>x.jornada===l.jornada); if(!m)return null;
-  return sum(l.slots.filter(Boolean).map(id=>{const p=byId(id),x=p&&p.log.find(y=>y.m.matchId===m.matchId);return x?x.pts*(id===l.captain?2:1):0}));
+  const plan=planFor(l.formation);
+  return sum(l.slots.map((id,i)=>{const p=id&&byId(id),x=p&&p.log.find(y=>y.m.matchId===m.matchId);return x?(x.pts+slotBonus(x,plan[i]))*(id===l.captain?2:1):0}));
 }
 function standings(){
   const by=new Map(MEMBERS.map(m=>[m.id,{m,p:byId(m.player_id),total:0,last:null,lj:0}]));
