@@ -221,8 +221,9 @@ const VOTE_DAYS = 3, EVENT_DAYS = 7;   // plazo para votar el MVP y para apuntar
 const START_JORNADA = 4;           // los puntos del fantasy empiezan a contar aquí; J2 y J3 solo calibran el mercado
 const BUDGET = 34;                 // M€ para el 7 inicial
 const VALUE0 = 5.0, VALUE_MIN = 1.0, VALUE_MAX = 25;
+const MVP_BONUS = [3,2,1];          // 1.º, 2.º y 3.º más votados del partido
 const POINTS = {juega:2, gol:4, golDEF:2, golPOR:4, asist:3, porteria:3, mvp:3, amarilla:-1, roja:-3, ausente:-3};
-const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (POR/DEF)","+3"],["MVP (el más votado)","+3"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
+const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (POR/DEF)","+3"],["MVP (el más votado)","+3"],["2.º más votado","+2"],["3.º más votado","+1"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
 const POS = {POR:"Portero",DEF:"Defensa",MED:"Medio",DEL:"Delantero"};
 const FORMS = {"2-3-1":{DEF:2,MED:3,DEL:1},"3-2-1":{DEF:3,MED:2,DEL:1},"2-2-2":{DEF:2,MED:2,DEL:2},"3-1-2":{DEF:3,MED:1,DEL:2},"1-3-2":{DEF:1,MED:3,DEL:2}};
 // Posiciones provisionales hasta que cada jugador elija la suya (la liga no publica posiciones)
@@ -280,9 +281,12 @@ function voteTally(j){
   const t=new Map(); VOTES.filter(v=>v.jornada===j).forEach(v=>[[v.first,3],[v.second,2],[v.third,1]].forEach(([id,pts])=>t.set(id,(t.get(id)||0)+pts)));
   return [...t.entries()].map(([id,pts])=>({p:byId(id),pts})).filter(x=>x.p).sort((a,b)=>b.pts-a.pts||a.p.n.localeCompare(b.p.n));
 }
-function mvpSet(j){                            // jugadores MVP cuando la votación está cerrada; null = usar el MVP de la liga
+function voteBonus(j){                         // Map jugador → {bonus, lugar} con la votación cerrada; null = usar el MVP de la liga
   if(!votesClosed(j)) return null;
-  const t=voteTally(j); return t.length?new Set(t.filter(x=>x.pts===t[0].pts).map(x=>x.p.id)):null;
+  const t=voteTally(j); if(!t.length) return null;
+  const levels=[...new Set(t.map(x=>x.pts))].slice(0,3), out=new Map();
+  t.forEach(x=>{const i=levels.indexOf(x.pts); if(i>=0) out.set(x.p.id,{bonus:MVP_BONUS[i],lugar:i+1})});
+  return out;
 }
 const PLAYED = DATA.partidos.filter(m=>m.estado===5).sort((a,b)=>a.jornada-b.jornada);
 const UPCOMING = DATA.partidos.filter(m=>m.estado!==5&&!m.descansa).sort((a,b)=>a.fecha.localeCompare(b.fecha));
@@ -304,12 +308,12 @@ function scoreOf(p,m){
   const conc=m.esLocal?m.golesVisitante:m.golesLocal;
   const ov=k=>EVMAP[m.jornada+":"+p.id+":"+k];
   const asist=ov("asist")??r.asistencias, amar=ov("amarilla")??r.amarillas, roja=ov("roja")??r.rojas;
-  const mv=mvpSet(m.jornada), isMvp=mv?mv.has(p.id):r.mvp;
+  const vb=voteBonus(m.jornada), vv=vb?vb.get(p.id):(r.mvp?{bonus:MVP_BONUS[0],lugar:1}:null);
   let pts=POINTS.juega, ev=[];
   if(r.goles){pts+=r.goles*(POINTS.gol+(p.pos==="DEF"?POINTS.golDEF:p.pos==="POR"?POINTS.golPOR:0));ev.push(r.goles+(r.goles>1?" goles":" gol"))}
   if(asist){pts+=asist*POINTS.asist;ev.push(asist+" asist.")}
   if((p.pos==="POR"||p.pos==="DEF")&&conc===0){pts+=POINTS.porteria;ev.push("Portería a cero")}
-  if(isMvp){pts+=POINTS.mvp;ev.push("MVP")}
+  if(vv){pts+=vv.bonus;ev.push(vv.lugar===1?"MVP":vv.lugar+".º más votado")}
   if(amar){pts+=amar*POINTS.amarilla;ev.push(amar+" amarilla"+(amar>1?"s":""))}
   if(roja){pts+=roja*POINTS.roja;ev.push(roja>1?roja+" rojas":"Roja")}
   return {pts,ev,ausente:false};
@@ -455,14 +459,14 @@ function votePanel(m){
   if(canVote){
     const opts=cur=>`<option value="">Elige…</option>`+pl.filter(p=>p.id!==meId).map(p=>`<option value="${p.id}" ${cur===p.id?"selected":""}>${p.n}</option>`).join("");
     const row=(k,l,pts)=>`<label class="votelabel"><span><b>${l}</b> <span class="sub">${pts}</span></span><select class="sel" id="v-${k}">${opts(my&&my[k])}</select></label>`;
-    return `<section class="glass card"><div><h3>Vota a los 3 mejores</h3><div class="sub">Cierra el ${fmtClose(j)}. No puedes votarte. El más votado es el MVP y suma +${POINTS.mvp}.</div></div>
+    return `<section class="glass card"><div><h3>Vota a los 3 mejores</h3><div class="sub">Cierra el ${fmtClose(j)}. No puedes votarte. El más votado es el MVP (+${MVP_BONUS[0]}), el 2.º suma +${MVP_BONUS[1]} y el 3.º +${MVP_BONUS[2]}.</div></div>
       ${row("first","1.º","3 puntos")}${row("second","2.º","2 puntos")}${row("third","3.º","1 punto")}
       <button class="btn" data-act="vote">${my?"Cambiar mi voto":"Enviar mi voto"}</button></section>`;
   }
   if(!votesClosed(j)) return `<section class="glass card"><h3>Votación MVP</h3><p class="sub" style="margin:0">Solo votan quienes jugaron este partido. Los resultados se ven cuando cierre la votación.</p></section>`;
   const t=voteTally(j).slice(0,3), top=t.length?t[0].pts:0;
   return `<section class="glass"><div class="sec"><h2>MVP del partido</h2><span class="eyebrow">Votación cerrada</span></div>
-    ${t.length?`<div class="list">${t.map((x,i)=>`<div class="row"><span class="rank ${i===0?"top3":""}">${i+1}</span><div class="av">${faceOf(x.p,x.p.num)}</div><div class="grow"><b>${x.p.n}</b>${x.pts===top?'<span class="sub">MVP · +'+POINTS.mvp+" puntos</span>":""}</div><div class="pts">${x.pts}</div></div>`).join("")}</div>`:'<p class="sub" style="padding:0 16px 16px;margin:0">Nadie votó en este partido.</p>'}</section>`;
+    ${t.length?`<div class="list">${t.map((x,i)=>`<div class="row"><span class="rank ${i===0?"top3":""}">${i+1}</span><div class="av">${faceOf(x.p,x.p.num)}</div><div class="grow"><b>${x.p.n}</b><span class="sub">${i===0&&x.pts===top?"MVP · ":""}+${MVP_BONUS[i]} puntos</span></div><div class="pts">${x.pts}</div></div>`).join("")}</div>`:'<p class="sub" style="padding:0 16px 16px;margin:0">Nadie votó en este partido.</p>'}</section>`;
 }
 function eventsPanel(m){
   const j=m.jornada, open=eventsOpen(j), meId=myPlayerId(), pl=playedIds(m);
@@ -491,7 +495,7 @@ function matchLog(m){
 function viewRank(){
   const seg=`<div class="glass seg" role="group" aria-label="Vista"><button data-rv="fant" aria-pressed="${rankView==="fant"}">Fantasy</button><button data-rv="jor" aria-pressed="${rankView==="jor"}">Jornadas</button><button data-rv="reg" aria-pressed="${rankView==="reg"}">Baremo</button></div>`;
   if(rankView==="reg") return seg+`<section class="glass"><div class="sec"><h2>Baremo</h2><span class="eyebrow">Desde la J${START_JORNADA}</span></div><div class="rules">${RULES.map(([k,v])=>`<span>${k}</span><span>${v}</span>`).join("")}</div></section>
-    <section class="glass card"><h3>Votación del MVP</h3><p class="sub" style="margin:0">Después de cada partido, quienes jugaron votan a los 3 mejores: 3, 2 y 1 puntos. No vale votarse. La votación cierra a los ${VOTE_DAYS} días del inicio del partido. El más votado suma el bonus de MVP (+${POINTS.mvp}); si hay empate, lo suman todos los empatados.</p></section>
+    <section class="glass card"><h3>Votación del MVP</h3><p class="sub" style="margin:0">Después de cada partido, quienes jugaron votan a los 3 mejores: 3, 2 y 1 puntos. No vale votarse. La votación cierra a los ${VOTE_DAYS} días del inicio del partido. El más votado es el MVP y suma +${MVP_BONUS[0]}, el segundo +${MVP_BONUS[1]} y el tercero +${MVP_BONUS[2]}. Si hay empate, todos los empatados suman lo mismo.</p></section>
     <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€."}</p></section>`;
   if(rankView==="jor"){
     const segj=`<div class="glass seg" role="group" aria-label="Jornada">${PLAYED.map(x=>`<button data-j="${x.jornada}" aria-pressed="${x.jornada===jsel}">J${x.jornada}</button>`).join("")}</div>`;

@@ -17,7 +17,7 @@ Reglas del juego: puntos desde la J4, presupuesto de 34 M€, capitán x2, valor
 ## Eventos y votación MVP
 
 - **Apuntar eventos** (Ranking → Jornadas): asistencias y tarjetas las apunta el equipo; los goles vienen del acta. Nadie puede apuntarse los suyos. Lo apuntado sustituye al dato de la liga.
-- **Votación MVP** (Ranking → Jornadas): quien jugó vota a los 3 mejores (3, 2 y 1 puntos). El más votado suma +3. Los votos son secretos hasta que cierra la votación, 3 días después del inicio del partido.
+- **Votación MVP** (Ranking → Jornadas): quien jugó vota a los 3 mejores (3, 2 y 1 puntos). El más votado suma +3, el 2.º +2 y el 3.º +1. Los votos son secretos hasta que cierra la votación, 3 días después del inicio del partido.
 - Requiere ejecutar `supabase/002_eventos_y_votos.sql` una vez en el editor SQL.
 
 ## Puesta en marcha (una sola vez)
