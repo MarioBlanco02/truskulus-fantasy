@@ -191,6 +191,16 @@ td .tn{display:flex;align-items:center;gap:8px;min-width:130px}
 .bigspark{width:100%;height:80px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:40;padding:10px 16px;border-radius:99px;background:var(--fg);color:var(--bg);font-size:13px;font-weight:600;box-shadow:var(--shadow);max-width:calc(100% - 32px);text-align:center}
 .field{width:100%;padding:14px;border-radius:16px;border:1px solid var(--edge-dim);background:var(--glass-strong);color:var(--fg);font:inherit;font-size:22px;letter-spacing:.5em;text-align:center}
+.sel{width:100%;padding:11px 12px;border-radius:14px;border:1px solid var(--edge-dim);background:var(--glass-strong);color:var(--fg);font:inherit;font-size:15px}
+.sel option{color:#111}
+.votelabel{display:grid;gap:6px}
+.evrow{flex-wrap:wrap}
+.evsteps{display:flex;gap:8px;width:100%;justify-content:space-between}
+.step2{display:grid;gap:4px;justify-items:center}
+.stepper{display:flex;align-items:center;gap:4px;background:var(--glass-strong);border:1px solid var(--edge-dim);border-radius:99px;padding:2px}
+.stepper button{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:18px;font-weight:700;text-align:center;background:var(--glass)}
+.stepper button[disabled]{opacity:.3;cursor:not-allowed}
+.stepper b{min-width:22px;text-align:center;font-family:var(--display);font-variant-numeric:tabular-nums}
 @keyframes fade{from{opacity:0}}
 @keyframes up{from{transform:translateY(40px);opacity:0}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -207,11 +217,12 @@ const DATA = /*DATA*/;
 const TEAM = DATA.equipo, TEAM_ID = DATA.equipoId;
 
 /* ── Reglas del juego ── */
+const VOTE_DAYS = 3, EVENT_DAYS = 7;   // plazo para votar el MVP y para apuntar eventos, desde el inicio del partido
 const START_JORNADA = 4;           // los puntos del fantasy empiezan a contar aquí; J2 y J3 solo calibran el mercado
 const BUDGET = 34;                 // M€ para el 7 inicial
 const VALUE0 = 5.0, VALUE_MIN = 1.0, VALUE_MAX = 25;
 const POINTS = {juega:2, gol:4, golDEF:2, golPOR:4, asist:3, porteria:3, mvp:3, amarilla:-1, roja:-3, ausente:-3};
-const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (POR/DEF)","+3"],["MVP del partido","+3"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
+const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (POR/DEF)","+3"],["MVP (el más votado)","+3"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
 const POS = {POR:"Portero",DEF:"Defensa",MED:"Medio",DEL:"Delantero"};
 const FORMS = {"2-3-1":{DEF:2,MED:3,DEL:1},"3-2-1":{DEF:3,MED:2,DEL:1},"2-2-2":{DEF:2,MED:2,DEL:2},"3-1-2":{DEF:3,MED:1,DEL:2},"1-3-2":{DEF:1,MED:3,DEL:2}};
 // Posiciones provisionales hasta que cada jugador elija la suya (la liga no publica posiciones)
@@ -242,6 +253,10 @@ function persist(){
   if(CLOUD){clearTimeout(saveTimer);saveTimer=setTimeout(saveLineup,500);return}
   try{localStorage.setItem("ft2",JSON.stringify(S))}catch(e){}
 }
+let EVENTS=S.events||[], VOTES=S.votes||[], EVMAP={}, JK={};
+const LOCAL_ME={id:"local",player_id:null};
+const meRow=()=>CLOUD?ME:LOCAL_ME;
+const myPlayerId=()=>CLOUD?(ME&&ME.player_id):null;
 const canEdit=p=>!CLOUD||(ME&&ME.player_id===p.id);
 const mail=pid=>"p"+pid+"@fantasy-truskulus.com";
 function toast(msg){
@@ -250,11 +265,30 @@ function toast(msg){
 }
 
 /* ── Calendario ── */
+function madrid(day,time){                    // "2026-11-08","17:00:00" → milisegundos UTC (hora de Madrid, con cambio de horario)
+  const y=+day.slice(0,4), lastSun=m=>{const x=new Date(Date.UTC(y,m+1,0));x.setUTCDate(x.getUTCDate()-x.getUTCDay());return x.getTime()+3600e3};
+  const start=lastSun(2), end=lastSun(9), t=Date.parse(day+"T"+time+"Z"), summer=t-2*3600e3;
+  return summer>=start&&summer<end?summer:t-3600e3;
+}
+const matchOf=j=>DATA.partidos.find(x=>x.jornada===j);
+const kickoffOf=j=>JK[j]||madrid(matchOf(j).fecha.slice(0,10),matchOf(j).hora||"17:00:00");
+const voteOpen=j=>!CLOUD||(Date.now()>=kickoffOf(j)&&Date.now()<kickoffOf(j)+VOTE_DAYS*864e5);
+const votesClosed=j=>!CLOUD||Date.now()>=kickoffOf(j)+VOTE_DAYS*864e5;
+const eventsOpen=j=>!CLOUD||(Date.now()>=kickoffOf(j)&&Date.now()<kickoffOf(j)+EVENT_DAYS*864e5);
+const myVote=j=>VOTES.find(v=>v.jornada===j&&v.voter===meRow().id);
+function voteTally(j){
+  const t=new Map(); VOTES.filter(v=>v.jornada===j).forEach(v=>[[v.first,3],[v.second,2],[v.third,1]].forEach(([id,pts])=>t.set(id,(t.get(id)||0)+pts)));
+  return [...t.entries()].map(([id,pts])=>({p:byId(id),pts})).filter(x=>x.p).sort((a,b)=>b.pts-a.pts||a.p.n.localeCompare(b.p.n));
+}
+function mvpSet(j){                            // jugadores MVP cuando la votación está cerrada; null = usar el MVP de la liga
+  if(!votesClosed(j)) return null;
+  const t=voteTally(j); return t.length?new Set(t.filter(x=>x.pts===t[0].pts).map(x=>x.p.id)):null;
+}
 const PLAYED = DATA.partidos.filter(m=>m.estado===5).sort((a,b)=>a.jornada-b.jornada);
 const UPCOMING = DATA.partidos.filter(m=>m.estado!==5&&!m.descansa).sort((a,b)=>a.fecha.localeCompare(b.fecha));
 const nm = UPCOMING[0];
 const NEXT = {m:nm, jornada:nm.jornada, local:nm.esLocal, rival:nm.esLocal?nm.visitante:nm.local, rivalId:nm.esLocal?nm.visitanteId:nm.localId,
-  when:new Date(nm.fecha.slice(0,10)+"T"+(nm.hora||"17:00:00")+"+01:00"), horaOk:!!nm.hora};
+  when:new Date(madrid(nm.fecha.slice(0,10),nm.hora||"17:00:00")), horaOk:!!nm.hora};
 const closed = ()=>Date.now()>=NEXT.when.getTime();
 function countdown(){
   const ms=NEXT.when-Date.now(); if(ms<=0) return "Cerrado";
@@ -268,16 +302,20 @@ function scoreOf(p,m){
   const r=(DATA.estadisticas[m.matchId]||[]).find(x=>x.userId===p.id);
   if(!r||!r.jugo) return {pts:POINTS.ausente,ev:[],ausente:true};
   const conc=m.esLocal?m.golesVisitante:m.golesLocal;
+  const ov=k=>EVMAP[m.jornada+":"+p.id+":"+k];
+  const asist=ov("asist")??r.asistencias, amar=ov("amarilla")??r.amarillas, roja=ov("roja")??r.rojas;
+  const mv=mvpSet(m.jornada), isMvp=mv?mv.has(p.id):r.mvp;
   let pts=POINTS.juega, ev=[];
   if(r.goles){pts+=r.goles*(POINTS.gol+(p.pos==="DEF"?POINTS.golDEF:p.pos==="POR"?POINTS.golPOR:0));ev.push(r.goles+(r.goles>1?" goles":" gol"))}
-  if(r.asistencias){pts+=r.asistencias*POINTS.asist;ev.push(r.asistencias+" asist.")}
+  if(asist){pts+=asist*POINTS.asist;ev.push(asist+" asist.")}
   if((p.pos==="POR"||p.pos==="DEF")&&conc===0){pts+=POINTS.porteria;ev.push("Portería a cero")}
-  if(r.mvp){pts+=POINTS.mvp;ev.push("MVP")}
-  if(r.amarillas){pts+=r.amarillas*POINTS.amarilla;ev.push(r.amarillas+" amarilla"+(r.amarillas>1?"s":""))}
-  if(r.rojas){pts+=r.rojas*POINTS.roja;ev.push("Roja")}
+  if(isMvp){pts+=POINTS.mvp;ev.push("MVP")}
+  if(amar){pts+=amar*POINTS.amarilla;ev.push(amar+" amarilla"+(amar>1?"s":""))}
+  if(roja){pts+=roja*POINTS.roja;ev.push(roja>1?roja+" rojas":"Roja")}
   return {pts,ev,ausente:false};
 }
 function compute(){
+  EVMAP={}; EVENTS.forEach(e=>{EVMAP[e.jornada+":"+e.player_id+":"+e.kind]=e.qty});
   P.forEach(p=>{
     p.pos=S.pos[p.id]||DEFPOS[p.id]||"MED";
     p.log=PLAYED.map(m=>({m,...scoreOf(p,m)}));
@@ -347,12 +385,14 @@ function viewHome(){
   const ups=movers.slice(0,3), dns=movers.slice(-3).reverse();
   const mv=p=>`<button class="mv" data-player="${p.id}"><div class="av" style="--s:34px">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b>${deltaHtml(p.lastDelta)}</div></button>`;
   const pct=Math.min(100,spent()/BUDGET*100);
-  return `<section class="glass hero">
+  const lj=PLAYED.length?PLAYED[PLAYED.length-1].jornada:null;
+  const pending=CLOUD&&lj&&voteOpen(lj)&&!myVote(lj)&&ME&&playedIds(matchOf(lj)).some(p=>p.id===ME.player_id);
+  return (pending?`<button class="glass card" style="text-align:left" data-gotovote="${lj}"><div class="eyebrow">Votación abierta</div><b class="num" style="font-size:18px">Vota a los 3 mejores de la J${lj}</b><span class="sub">Cierra el ${fmtClose(lj)}</span></button>`:"")+`<section class="glass hero">
     <div class="eyebrow" style="text-align:center">Jornada ${NEXT.jornada} · ${S.locked?"Tu 7 está confirmado":"Próximo partido"}</div>
     <div class="vs"><div class="t">${crest(L[0],L[1],58)}<b>${L[1]}</b></div>
       <div class="mid"><span class="num" style="color:var(--muted)">VS</span></div>
       <div class="t">${crest(R[0],R[1],58)}<b>${R[1]}</b></div></div>
-    <div class="meta"><span class="pill">${ds}${NEXT.horaOk?", "+NEXT.when.toTimeString().slice(0,5):" · hora por confirmar"}</span>${NEXT.m.campo?`<span class="pill">${NEXT.m.campo}</span>`:""}</div>
+    <div class="meta"><span class="pill">${ds}${NEXT.horaOk?", "+NEXT.when.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Madrid"}):" · hora por confirmar"}</span>${NEXT.m.campo?`<span class="pill">${NEXT.m.campo}</span>`:""}</div>
     <div style="text-align:center"><div class="eyebrow">El 7 se cierra en</div><div class="num cd" id="cd">${countdown()}</div></div>
     ${rv?`<div class="rivalrow"><span>Rival: <b>${rv.pos}º</b> · ${rv.pts} pts · ${rv.gf}-${rv.gc} goles</span>${formDots(rv.racha)}</div>`:""}
   </section>
@@ -407,12 +447,42 @@ function viewMarket(){
      <div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
   <p class="note">El valor de cada jugador sube o baja tras cada partido según su rendimiento. Toca un jugador para ver su ficha, cambiar su posición y subir su foto.</p>`;
 }
+const playedIds=m=>P.filter(p=>{const r=(DATA.estadisticas[m.matchId]||[]).find(x=>x.userId===p.id);return r&&r.jugo});
+const fmtClose=j=>new Date(kickoffOf(j)+VOTE_DAYS*864e5).toLocaleDateString("es-ES",{weekday:"long",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Madrid"});
+function votePanel(m){
+  const j=m.jornada, pl=playedIds(m), meId=myPlayerId(), my=myVote(j);
+  const canVote=voteOpen(j)&&(!CLOUD||(ME&&pl.some(p=>p.id===ME.player_id)));
+  if(canVote){
+    const opts=cur=>`<option value="">Elige…</option>`+pl.filter(p=>p.id!==meId).map(p=>`<option value="${p.id}" ${cur===p.id?"selected":""}>${p.n}</option>`).join("");
+    const row=(k,l,pts)=>`<label class="votelabel"><span><b>${l}</b> <span class="sub">${pts}</span></span><select class="sel" id="v-${k}">${opts(my&&my[k])}</select></label>`;
+    return `<section class="glass card"><div><h3>Vota a los 3 mejores</h3><div class="sub">Cierra el ${fmtClose(j)}. No puedes votarte. El más votado es el MVP y suma +${POINTS.mvp}.</div></div>
+      ${row("first","1.º","3 puntos")}${row("second","2.º","2 puntos")}${row("third","3.º","1 punto")}
+      <button class="btn" data-act="vote">${my?"Cambiar mi voto":"Enviar mi voto"}</button></section>`;
+  }
+  if(!votesClosed(j)) return `<section class="glass card"><h3>Votación MVP</h3><p class="sub" style="margin:0">Solo votan quienes jugaron este partido. Los resultados se ven cuando cierre la votación.</p></section>`;
+  const t=voteTally(j).slice(0,3), top=t.length?t[0].pts:0;
+  return `<section class="glass"><div class="sec"><h2>MVP del partido</h2><span class="eyebrow">Votación cerrada</span></div>
+    ${t.length?`<div class="list">${t.map((x,i)=>`<div class="row"><span class="rank ${i===0?"top3":""}">${i+1}</span><div class="av">${faceOf(x.p,x.p.num)}</div><div class="grow"><b>${x.p.n}</b>${x.pts===top?'<span class="sub">MVP · +'+POINTS.mvp+" puntos</span>":""}</div><div class="pts">${x.pts}</div></div>`).join("")}</div>`:'<p class="sub" style="padding:0 16px 16px;margin:0">Nadie votó en este partido.</p>'}</section>`;
+}
+function eventsPanel(m){
+  const j=m.jornada, open=eventsOpen(j), meId=myPlayerId(), pl=playedIds(m);
+  const val=(p,k)=>{const o=EVMAP[j+":"+p.id+":"+k];if(o!==undefined)return o;const r=DATA.estadisticas[m.matchId].find(x=>x.userId===p.id);return k==="asist"?r.asistencias:k==="amarilla"?r.amarillas:r.rojas};
+  const step=(p,k,l)=>{const v=val(p,k),dis=!open||p.id===meId;return `<div class="step2"><span class="sub">${l}</span><div class="stepper">
+    <button data-ev="${j}:${p.id}:${k}:-1" ${dis||v<=0?"disabled":""} aria-label="Quitar ${l} a ${p.n}">−</button><b>${v}</b>
+    <button data-ev="${j}:${p.id}:${k}:1" ${dis||v>=20?"disabled":""} aria-label="Añadir ${l} a ${p.n}">+</button></div></div>`};
+  return `<section class="glass"><div class="sec"><h2>Apuntar eventos</h2><span class="eyebrow">${open?"Abierto":"Cerrado"}</span></div>
+    <p class="sub" style="padding:0 16px 8px;margin:0">Las asistencias y las tarjetas las apuntamos entre nosotros. Los goles vienen del acta. No puedes apuntar tus propios eventos.</p>
+    <div class="list">${pl.map(p=>`<div class="row evrow"><div class="av" style="--s:34px">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b>${p.id===meId?'<span class="sub">Te lo apunta otro compañero</span>':""}</div>
+      <div class="evsteps">${step(p,"asist","Asist.")}${step(p,"amarilla","Amarillas")}${step(p,"roja","Rojas")}</div></div>`).join("")}</div></section>`;
+}
 function matchLog(m){
   const rows=P.map(p=>({p,...p.log.find(x=>x.m.matchId===m.matchId)})).sort((a,b)=>b.pts-a.pts);
   const counts=m.jornada>=START_JORNADA;
   return `<section class="glass card"><div class="eyebrow">Jornada ${m.jornada} · ${dfmt(m.fecha,{day:"numeric",month:"long"})}</div>
     <div class="hero" style="padding:0"><div class="vs"><div class="t">${crest(m.localId,m.local,46)}<b>${m.local}</b></div><div class="mid"><span class="num score">${m.golesLocal}–${m.golesVisitante}</span></div><div class="t">${crest(m.visitanteId,m.visitante,46)}<b>${m.visitante}</b></div></div></div>
     <span class="pill" style="justify-self:center">${counts?"Cuenta para el fantasy":"Pretemporada: calibra el mercado, no suma puntos"}</span></section>
+  ${votePanel(m)}
+  ${eventsPanel(m)}
   <section class="glass"><div class="sec"><h2>Rendimiento</h2><span class="eyebrow">Jornada ${m.jornada}</span></div>
    <div class="list">${rows.map(({p,ev,pts,ausente,delta})=>`<button class="row" data-player="${p.id}"><div class="av">${faceOf(p,p.num)}</div>
      <div class="grow"><b>${p.n}</b><div class="chips">${posPill(p.pos)}${ev.map(e=>`<span class="chip ${/amarilla|Roja/.test(e)?"neg":""}">${e}</span>`).join("")}${ausente?'<span class="chip neg">No se presentó</span>':""}</div></div>
@@ -421,6 +491,7 @@ function matchLog(m){
 function viewRank(){
   const seg=`<div class="glass seg" role="group" aria-label="Vista"><button data-rv="fant" aria-pressed="${rankView==="fant"}">Fantasy</button><button data-rv="jor" aria-pressed="${rankView==="jor"}">Jornadas</button><button data-rv="reg" aria-pressed="${rankView==="reg"}">Baremo</button></div>`;
   if(rankView==="reg") return seg+`<section class="glass"><div class="sec"><h2>Baremo</h2><span class="eyebrow">Desde la J${START_JORNADA}</span></div><div class="rules">${RULES.map(([k,v])=>`<span>${k}</span><span>${v}</span>`).join("")}</div></section>
+    <section class="glass card"><h3>Votación del MVP</h3><p class="sub" style="margin:0">Después de cada partido, quienes jugaron votan a los 3 mejores: 3, 2 y 1 puntos. No vale votarse. La votación cierra a los ${VOTE_DAYS} días del inicio del partido. El más votado suma el bonus de MVP (+${POINTS.mvp}); si hay empate, lo suman todos los empatados.</p></section>
     <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€."}</p></section>`;
   if(rankView==="jor"){
     const segj=`<div class="glass seg" role="group" aria-label="Jornada">${PLAYED.map(x=>`<button data-j="${x.jornada}" aria-pressed="${x.jornada===jsel}">J${x.jornada}</button>`).join("")}</div>`;
@@ -493,7 +564,7 @@ document.addEventListener("change",e=>{
   });
 });
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-form],[data-cap],[data-mf],[data-ms],[data-rv],[data-player],[data-setpos]"); if(!t)return;
+  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-ev],[data-gotovote],[data-form],[data-cap],[data-mf],[data-ms],[data-rv],[data-player],[data-setpos]"); if(!t)return;
   const d=t.dataset;
   if(d.act==="close"){ if(t.classList.contains("scrim")&&e.target.closest(".sheet"))return; sheet(""); return }
   if(d.tab){tab=d.tab;sheet("");render();window.scrollTo(0,0)}
@@ -510,9 +581,35 @@ document.addEventListener("click",e=>{
   else if(d.act==="lock"){S.locked=true;persist();render()}
   else if(d.act==="unlock"){S.locked=false;persist();render()}
   else if(d.act==="logout"){logout()}
+  else if(d.act==="vote"){sendVote()}
+  else if(d.gotovote){tab="rank";rankView="jor";jsel=+d.gotovote;render();window.scrollTo(0,0)}
+  else if(d.ev&&!t.disabled){const[j,pid,k,dl]=d.ev.split(":");changeEvent(+j,+pid,k,+dl)}
   else if(d.join){sheet(joinSheet(+d.join))}
   else if(d.act==="clear"){S.slots=slotPlan().map(()=>null);S.cap=null;persist();render()}
 });
+function persistLocal(){S.events=EVENTS;S.votes=VOTES;persist()}
+async function changeEvent(j,pid,kind,delta){
+  const m=matchOf(j), r=DATA.estadisticas[m.matchId].find(x=>x.userId===pid);
+  const base=kind==="asist"?r.asistencias:kind==="amarilla"?r.amarillas:r.rojas;
+  const cur=EVMAP[j+":"+pid+":"+kind]; const qty=Math.max(0,Math.min(20,(cur===undefined?base:cur)+delta));
+  const row={jornada:j,player_id:pid,kind,qty,by_member:meRow().id};
+  if(CLOUD){const{error}=await sb.from("events").upsert(row,{onConflict:"jornada,player_id,kind"});if(error){toast(eventsOpen(j)?"No se pudo guardar":"El plazo para apuntar ha terminado");return}}
+  const i=EVENTS.findIndex(e=>e.jornada===j&&e.player_id===pid&&e.kind===kind);
+  if(i>=0)EVENTS[i]=row;else EVENTS.push(row);
+  if(!CLOUD)persistLocal();
+  compute();render();
+}
+async function sendVote(){
+  const j=jsel, v={first:+document.getElementById("v-first").value,second:+document.getElementById("v-second").value,third:+document.getElementById("v-third").value};
+  if(!v.first||!v.second||!v.third){toast("Elige a los tres");return}
+  if(new Set([v.first,v.second,v.third]).size<3){toast("No puedes repetir jugadores");return}
+  const row={jornada:j,voter:meRow().id,...v};
+  if(CLOUD){const{error}=await sb.from("votes").upsert(row,{onConflict:"jornada,voter"});if(error){toast(voteOpen(j)?"No se pudo guardar el voto":"La votación ya ha cerrado");return}}
+  const i=VOTES.findIndex(x=>x.jornada===j&&x.voter===row.voter);
+  if(i>=0)VOTES[i]=row;else VOTES.push(row);
+  if(!CLOUD)persistLocal();
+  toast("Voto guardado");compute();render();
+}
 async function setPos(id,pos){
   if(CLOUD){const{error}=await sb.from("members").update({pos}).eq("id",ME.id);if(error){toast("No se pudo guardar la posición");return}ME.pos=pos}
   S.pos[id]=pos;compute();reconcile();persist();render();sheet(profile(+id));
@@ -548,8 +645,10 @@ document.addEventListener("submit",async e=>{
 });
 async function logout(){await sb.auth.signOut();ME=null;S.slots=[];S.cap=null;S.locked=false;CLAIMED=(await sb.rpc("claimed_players")).data||[];sheet("");render()}
 async function loadCloud(){
-  const[ms,js,ls,u]=await Promise.all([sb.from("members").select("id,player_id,pos,photo"),sb.from("jornadas").select("jornada,kickoff"),
-    sb.from("lineups").select("member_id,jornada,formation,slots,captain,confirmed"),sb.auth.getUser()]);
+  const[ms,js,ls,u,evs,vts]=await Promise.all([sb.from("members").select("id,player_id,pos,photo"),sb.from("jornadas").select("jornada,kickoff"),
+    sb.from("lineups").select("member_id,jornada,formation,slots,captain,confirmed"),sb.auth.getUser(),
+    sb.from("events").select("jornada,player_id,kind,qty,by_member"),sb.from("votes").select("jornada,voter,first,second,third")]);
+  EVENTS=evs.data||[]; VOTES=vts.data||[]; JK={}; (js.data||[]).forEach(j=>{JK[j.jornada]=new Date(j.kickoff).getTime()});
   MEMBERS=ms.data||[]; LINEUPS=(ls.data||[]).map(l=>({...l,slots:(l.slots||[]).map(x=>x||null)}));
   const k=(js.data||[]).find(j=>j.jornada===NEXT.jornada); if(k){NEXT.when=new Date(k.kickoff);NEXT.horaOk=true}
   S.pos={};S.photos={}; MEMBERS.forEach(m=>{if(m.pos)S.pos[m.player_id]=m.pos;if(m.photo)S.photos[m.player_id]=m.photo});

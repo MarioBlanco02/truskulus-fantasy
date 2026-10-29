@@ -14,6 +14,12 @@ Fantasy interno del equipo. Los datos salen de Liga Elite Fútbol (API pública,
 
 Reglas del juego: puntos desde la J4, presupuesto de 34 M€, capitán x2, valor de mercado que se mueve tras cada partido. Se cambian al principio de `template.html` (`START_JORNADA`, `BUDGET`, `POINTS`).
 
+## Eventos y votación MVP
+
+- **Apuntar eventos** (Ranking → Jornadas): asistencias y tarjetas las apunta el equipo; los goles vienen del acta. Nadie puede apuntarse los suyos. Lo apuntado sustituye al dato de la liga.
+- **Votación MVP** (Ranking → Jornadas): quien jugó vota a los 3 mejores (3, 2 y 1 puntos). El más votado suma +3. Los votos son secretos hasta que cierra la votación, 3 días después del inicio del partido.
+- Requiere ejecutar `supabase/002_eventos_y_votos.sql` una vez en el editor SQL.
+
 ## Puesta en marcha (una sola vez)
 
 1. **Supabase**: crea un proyecto en supabase.com (plan gratuito).
