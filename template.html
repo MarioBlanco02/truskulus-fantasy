@@ -1,0 +1,597 @@
+<title>Fantasy Truskulus</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap">
+<!--SUPABASE_SCRIPT-->
+<style>
+/* Layout: columna móvil (iOS), fondo de campo difuminado, tarjetas Liquid Glass, tab bar flotante de 5 pestañas */
+:root{
+  --bg:#e9f1ec; --fg:#0e1a14; --muted:#5a6b62;
+  --accent:#12b76a; --accent-fg:#04210f; --warn:#e5484d; --gold:#e8a317; --up:#12a35f; --down:#e5484d;
+  --glass:rgba(255,255,255,.58); --glass-strong:rgba(255,255,255,.78);
+  --edge:rgba(255,255,255,.85); --edge-dim:rgba(14,26,20,.08);
+  --shadow:0 10px 30px rgba(20,60,40,.14);
+  --blob1:#7fe3ae; --blob2:#9bd0ff; --blob3:#ffe39a;
+  --pitch-a:#1f9d5c; --pitch-b:#178a50; --pitch-line:rgba(255,255,255,.55);
+  --display:"Bricolage Grotesque",-apple-system,"SF Pro Display","Helvetica Neue",sans-serif;
+  --body:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#07120d; --fg:#eef6f1; --muted:#8fa399;
+  --accent:#34d98b; --accent-fg:#03180d; --warn:#ff6b70; --gold:#f5bd45; --up:#34d98b; --down:#ff6b70;
+  --glass:rgba(255,255,255,.07); --glass-strong:rgba(255,255,255,.13);
+  --edge:rgba(255,255,255,.2); --edge-dim:rgba(255,255,255,.06);
+  --shadow:0 12px 34px rgba(0,0,0,.45);
+  --blob1:#0f6b44; --blob2:#12456e; --blob3:#5a4310;
+  --pitch-a:#14663d; --pitch-b:#115a36; --pitch-line:rgba(255,255,255,.4);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#07120d; --fg:#eef6f1; --muted:#8fa399;
+  --accent:#34d98b; --accent-fg:#03180d; --warn:#ff6b70; --gold:#f5bd45; --up:#34d98b; --down:#ff6b70;
+  --glass:rgba(255,255,255,.07); --glass-strong:rgba(255,255,255,.13);
+  --edge:rgba(255,255,255,.2); --edge-dim:rgba(255,255,255,.06);
+  --shadow:0 12px 34px rgba(0,0,0,.45);
+  --blob1:#0f6b44; --blob2:#12456e; --blob3:#5a4310;
+  --pitch-a:#14663d; --pitch-b:#115a36; --pitch-line:rgba(255,255,255,.4);
+  color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.4;
+  padding-block:0 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  min-height:100%;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 40% at 15% 8%,var(--blob1),transparent 70%),
+             radial-gradient(55% 40% at 90% 30%,var(--blob2),transparent 70%),
+             radial-gradient(60% 45% at 30% 95%,var(--blob3),transparent 70%)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding-top:14px}
+.glass{background:var(--glass);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);
+  border:1px solid var(--edge-dim);box-shadow:var(--shadow),inset 0 1px 0 var(--edge);border-radius:26px}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.sub{font-size:12px;color:var(--muted)}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+h1{font-size:25px;font-weight:800;letter-spacing:-.02em}
+h2{font-size:20px;font-weight:700;letter-spacing:-.01em}
+h3{font-size:16px;font-weight:700}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:8px 12px;padding:6px 4px 0}
+.badge{font-size:11px;font-weight:600;padding:5px 10px;border-radius:99px;background:var(--glass);border:1px solid var(--edge-dim);color:var(--muted);white-space:nowrap}
+.card{padding:18px;display:grid;gap:14px}
+.sec{padding:16px 16px 6px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+
+/* escudos y fotos */
+.crest{--s:44px;width:var(--s);height:var(--s);flex:none;display:grid;place-items:center;border-radius:28%;overflow:hidden;
+  font-family:var(--display);font-weight:800;font-size:calc(var(--s)*.36);color:#fff;letter-spacing:-.02em}
+.crest img{width:100%;height:100%;object-fit:contain;display:block}
+.crest.fb{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.25)}
+.av{--s:40px;width:var(--s);height:var(--s);border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:calc(var(--s)*.36);
+  background:var(--glass-strong);border:1px solid var(--edge-dim);flex:none;overflow:hidden;position:relative}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.posdot{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:99px;color:#fff}
+.p-POR{background:#e0912b}.p-DEF{background:#3b82f6}.p-MED{background:#16a765}.p-DEL{background:#e5484d}
+
+/* hero partido */
+.hero{padding:20px 18px 16px;display:grid;gap:16px;position:relative;overflow:hidden}
+.hero .vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.hero .t{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;min-width:0}
+.hero .t b{font-family:var(--display);font-size:15px;line-height:1.15;overflow-wrap:anywhere}
+.hero .mid{display:flex;flex-direction:column;align-items:center;gap:2px}
+.hero .mid .num{font-size:26px;font-weight:800;line-height:1}
+.hero .score{font-size:34px}
+.cd{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.meta{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.pill{font-size:12px;padding:6px 11px;border-radius:99px;background:var(--glass-strong);border:1px solid var(--edge-dim)}
+.pill.ok{background:var(--accent);color:var(--accent-fg);border-color:transparent;font-weight:700}
+.dots{display:inline-flex;gap:4px;vertical-align:middle}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.w{background:var(--up)}.dot.l{background:var(--down)}.dot.d{background:var(--gold)}
+.rivalrow{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding-top:12px;border-top:1px solid var(--edge-dim)}
+
+/* presupuesto */
+.meter{height:10px;border-radius:99px;background:var(--glass-strong);overflow:hidden;border:1px solid var(--edge-dim)}
+.meter i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width .3s}
+.meter.over i{background:var(--warn)}
+
+/* campo */
+.pitch{position:relative;padding:18px 10px 16px;border-radius:26px;overflow:hidden;
+  background:repeating-linear-gradient(0deg,var(--pitch-a) 0 44px,var(--pitch-b) 44px 88px);
+  box-shadow:var(--shadow),inset 0 1px 0 var(--edge);border:1px solid var(--edge-dim)}
+.pitch::before{content:"";position:absolute;inset:10px;border:1.5px solid var(--pitch-line);border-radius:14px;pointer-events:none}
+.pitch::after{content:"";position:absolute;left:50%;top:50%;width:84px;height:84px;margin:-42px;border:1.5px solid var(--pitch-line);border-radius:50%;pointer-events:none}
+.line{position:relative;z-index:1;display:flex;justify-content:space-around;margin:0 0 18px}
+.line:last-child{margin-bottom:0}
+.slot{width:78px;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.shirt{--s:54px;width:var(--s);height:var(--s);border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:18px;
+  background:rgba(255,255,255,.18);border:1.5px dashed rgba(255,255,255,.7);color:#fff;overflow:hidden;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:transform .15s}
+.shirt img{width:100%;height:100%;object-fit:cover}
+.slot.filled .shirt{background:#fff;color:#0b3b22;border:2.5px solid #fff;box-shadow:0 6px 14px rgba(0,0,0,.25)}
+.slot:active .shirt{transform:scale(.94)}
+.slot .nm{font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot .ln{font-size:10px;color:rgba(255,255,255,.8);letter-spacing:.06em;font-weight:600}
+.cap{position:absolute;top:-4px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--gold);color:#2a1d00;font-size:11px;font-weight:800;display:grid;place-items:center;border:2px solid #fff;z-index:2}
+.slot[disabled]{cursor:default}
+
+/* botones y controles */
+.bar{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:14px 16px;flex-wrap:wrap}
+.btn{padding:12px 20px;border-radius:99px;font-weight:700;background:var(--accent);color:var(--accent-fg);box-shadow:0 6px 16px rgba(18,183,106,.35);text-align:center}
+.btn[disabled]{opacity:.4;box-shadow:none;cursor:not-allowed}
+.btn.ghost{background:var(--glass-strong);color:var(--fg);box-shadow:none;border:1px solid var(--edge-dim)}
+.seg{display:flex;gap:6px;padding:4px;border-radius:99px;overflow-x:auto;scrollbar-width:none}
+.seg button{flex:1;min-height:36px;padding:7px 14px;border-radius:99px;font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap;text-align:center}
+.seg button[aria-pressed="true"]{background:var(--glass-strong);color:var(--accent);box-shadow:inset 0 1px 0 var(--edge)}
+.chipsel{display:flex;gap:8px;flex-wrap:wrap}
+.chipsel button{padding:7px 12px;border-radius:99px;background:var(--glass);border:1px solid var(--edge-dim);font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.chipsel button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+
+/* listas */
+.list{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--edge-dim);width:100%}
+.row:first-child{border-top:0}
+.row .grow{flex:1;min-width:0}
+.row .grow b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.me{background:var(--glass-strong)}
+.row[disabled]{opacity:.4;cursor:not-allowed}
+.pts{font-family:var(--display);font-weight:800;font-size:18px;font-variant-numeric:tabular-nums;text-align:right;min-width:42px}
+.pts.neg,.neg{color:var(--warn)}
+.val{text-align:right;min-width:62px}
+.val b{font-family:var(--display);font-size:16px;display:block}
+.delta{font-size:11px;font-weight:700}
+.delta.up{color:var(--up)}.delta.dn{color:var(--down)}.delta.eq{color:var(--muted)}
+.spark{width:56px;height:24px;flex:none}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.chip{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--glass-strong);border:1px solid var(--edge-dim)}
+.chip.neg{color:var(--warn)}
+.rank{width:26px;text-align:center;font-family:var(--display);font-weight:800;color:var(--muted)}
+.rank.top3{color:var(--gold)}
+.tablewrap{overflow-x:auto;padding:0 6px 10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:center;padding:6px 4px}
+td{padding:8px 4px;text-align:center;border-top:1px solid var(--edge-dim);font-variant-numeric:tabular-nums}
+th:nth-child(2),td:nth-child(2){text-align:left}
+tr.me td{background:var(--glass-strong);font-weight:700}
+td .tn{display:flex;align-items:center;gap:8px;min-width:130px}
+.rules{padding:6px 16px 14px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:13px}
+.rules span:nth-child(even){text-align:right;font-weight:700;font-family:var(--display)}
+.rules span{padding:6px 0;border-top:1px solid var(--edge-dim)}
+.note{font-size:12px;color:var(--muted);padding:0 6px}
+.empty{padding:22px 18px;text-align:center;display:grid;gap:6px;justify-items:center}
+.movers{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 16px}
+.mv{display:flex;align-items:center;gap:8px;padding:8px;border-radius:16px;background:var(--glass-strong);border:1px solid var(--edge-dim);min-width:0;width:100%}
+.mv .grow{min-width:0;flex:1}
+.mv b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.matchrow{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:11px 14px;border-top:1px solid var(--edge-dim);font-size:13px}
+.matchrow:first-child{border-top:0}
+.matchrow .tm{display:flex;align-items:center;gap:8px;min-width:0}
+.matchrow .tm.r{justify-content:flex-end;text-align:right}
+.matchrow .tm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.matchrow .mid{text-align:center;font-family:var(--display);font-weight:800;min-width:64px;font-size:15px}
+.matchrow .mid small{display:block;font-family:var(--body);font-weight:500;color:var(--muted);font-size:10px}
+
+/* tab bar y hojas */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;
+  padding:0 max(16px,env(safe-area-inset-left,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px));pointer-events:none}
+.tabs nav{pointer-events:auto;display:flex;gap:2px;padding:6px;width:100%;max-width:460px;border-radius:99px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:99px;font-size:10.5px;font-weight:600;color:var(--muted);transition:background .2s,color .2s;text-align:center}
+.tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-selected="true"]{background:var(--glass-strong);color:var(--accent);box-shadow:inset 0 1px 0 var(--edge)}
+.scrim{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+.sheet{width:100%;max-width:480px;max-height:86%;overflow:auto;border-radius:28px 28px 0 0;background:var(--bg);
+  padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));animation:up .25s cubic-bezier(.2,.9,.3,1);border-bottom:0}
+.sheet .grab{width:38px;height:5px;border-radius:9px;margin:8px auto 4px;background:var(--muted);opacity:.4}
+.profile{display:grid;gap:14px;padding:14px 16px 8px;justify-items:center;text-align:center}
+.bigav{--s:96px}
+.avbtn{position:relative;cursor:pointer;display:inline-block}
+.avbtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.avbtn .cam{position:absolute;right:-2px;bottom:-2px;min-width:26px;height:26px;padding:0 8px;border-radius:99px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font-size:11px;font-weight:800;border:2px solid var(--bg)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%}
+.stat{padding:10px 4px;border-radius:16px;background:var(--glass-strong);border:1px solid var(--edge-dim)}
+.stat b{display:block;font-family:var(--display);font-size:18px}
+.bigspark{width:100%;height:80px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:40;padding:10px 16px;border-radius:99px;background:var(--fg);color:var(--bg);font-size:13px;font-weight:600;box-shadow:var(--shadow);max-width:calc(100% - 32px);text-align:center}
+.field{width:100%;padding:14px;border-radius:16px;border:1px solid var(--edge-dim);background:var(--glass-strong);color:var(--fg);font:inherit;font-size:22px;letter-spacing:.5em;text-align:center}
+@keyframes fade{from{opacity:0}}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="app" id="app"></div>
+<div class="tabs"><nav class="glass" id="tabs" role="tablist"></nav></div>
+<div id="layer"></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+/* ── Datos de Liga Elite Fútbol (los genera scrape.py) ── */
+const DATA = /*DATA*/;
+const TEAM = DATA.equipo, TEAM_ID = DATA.equipoId;
+
+/* ── Reglas del juego ── */
+const START_JORNADA = 4;           // los puntos del fantasy empiezan a contar aquí; J2 y J3 solo calibran el mercado
+const BUDGET = 34;                 // M€ para el 7 inicial
+const VALUE0 = 5.0, VALUE_MIN = 1.0, VALUE_MAX = 25;
+const POINTS = {juega:2, gol:4, golDEF:2, golPOR:4, asist:3, porteria:3, mvp:3, amarilla:-1, roja:-3, ausente:-3};
+const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (POR/DEF)","+3"],["MVP del partido","+3"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
+const POS = {POR:"Portero",DEF:"Defensa",MED:"Medio",DEL:"Delantero"};
+const FORMS = {"2-3-1":{DEF:2,MED:3,DEL:1},"3-2-1":{DEF:3,MED:2,DEL:1},"2-2-2":{DEF:2,MED:2,DEL:2},"3-1-2":{DEF:3,MED:1,DEL:2},"1-3-2":{DEF:1,MED:3,DEL:2}};
+// Posiciones provisionales hasta que cada jugador elija la suya (la liga no publica posiciones)
+const DEFPOS = {50209:"DEL",9003:"DEF",8889:"DEF",8765:"MED",10567:"DEF",8999:"MED",7060:"DEL",9005:"MED",9001:"DEL",9006:"DEL",9000:"MED",8998:"POR",8997:"POR",9002:"DEF"};
+
+/* ── Utilidades ── */
+const sum = a=>a.reduce((x,y)=>x+y,0);
+const fmt = n=>(n>0?"+":"")+n;
+const money = v=>v.toFixed(1).replace(".",",")+" M€";
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const short = j=>j.alias||(j.nombre+" "+j.apellido[0]+".");
+const dfmt = (iso,o)=>new Date(iso).toLocaleDateString("es-ES",o);
+const hue = s=>{let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;return h};
+const initials = n=>String(n).split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+function crest(id,name,s=44){
+  const u=DATA.escudos&&DATA.escudos[id];
+  return u?`<span class="crest" style="--s:${s}px"><img src="${u}" alt="${name||""}"></span>`
+          :`<span class="crest fb" style="--s:${s}px;background:hsl(${hue(name)} 55% 38%)">${initials(name||"?")}</span>`;
+}
+
+/* ── Estado guardado en el navegador ── */
+const CFG = /*CONFIG*/;            // {url, key} de Supabase; null = modo local (todo en el navegador)
+let CLOUD = !!(CFG && window.supabase), booting = CLOUD;
+let sb=null, ME=null, MEMBERS=[], LINEUPS=[], CLAIMED=[], authErr="", saveTimer=null, toastTimer=null;
+let S={pos:{},photos:{},form:"2-3-1",slots:[],cap:null,locked:false};
+if(!CLOUD){try{Object.assign(S,JSON.parse(localStorage.getItem("ft2")||"{}"))}catch(e){}}
+function persist(){
+  if(CLOUD){clearTimeout(saveTimer);saveTimer=setTimeout(saveLineup,500);return}
+  try{localStorage.setItem("ft2",JSON.stringify(S))}catch(e){}
+}
+const canEdit=p=>!CLOUD||(ME&&ME.player_id===p.id);
+const mail=pid=>"p"+pid+"@fantasy-truskulus.com";
+function toast(msg){
+  const t=document.getElementById("toast"); t.textContent=msg; t.hidden=false;
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{t.hidden=true},2200);
+}
+
+/* ── Calendario ── */
+const PLAYED = DATA.partidos.filter(m=>m.estado===5).sort((a,b)=>a.jornada-b.jornada);
+const UPCOMING = DATA.partidos.filter(m=>m.estado!==5&&!m.descansa).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+const nm = UPCOMING[0];
+const NEXT = {m:nm, jornada:nm.jornada, local:nm.esLocal, rival:nm.esLocal?nm.visitante:nm.local, rivalId:nm.esLocal?nm.visitanteId:nm.localId,
+  when:new Date(nm.fecha.slice(0,10)+"T"+(nm.hora||"17:00:00")+"+01:00"), horaOk:!!nm.hora};
+const closed = ()=>Date.now()>=NEXT.when.getTime();
+function countdown(){
+  const ms=NEXT.when-Date.now(); if(ms<=0) return "Cerrado";
+  const d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),m=Math.floor(ms%36e5/6e4);
+  return (d?d+"d ":"")+h+"h "+String(m).padStart(2,"0")+"m";
+}
+
+/* ── Puntuación, valor de mercado y rendimiento ── */
+const P = DATA.jugadores.map(j=>({id:j.userId,n:short(j),full:j.nombre+" "+j.apellido,num:j.dorsal,j}));
+function scoreOf(p,m){
+  const r=(DATA.estadisticas[m.matchId]||[]).find(x=>x.userId===p.id);
+  if(!r||!r.jugo) return {pts:POINTS.ausente,ev:[],ausente:true};
+  const conc=m.esLocal?m.golesVisitante:m.golesLocal;
+  let pts=POINTS.juega, ev=[];
+  if(r.goles){pts+=r.goles*(POINTS.gol+(p.pos==="DEF"?POINTS.golDEF:p.pos==="POR"?POINTS.golPOR:0));ev.push(r.goles+(r.goles>1?" goles":" gol"))}
+  if(r.asistencias){pts+=r.asistencias*POINTS.asist;ev.push(r.asistencias+" asist.")}
+  if((p.pos==="POR"||p.pos==="DEF")&&conc===0){pts+=POINTS.porteria;ev.push("Portería a cero")}
+  if(r.mvp){pts+=POINTS.mvp;ev.push("MVP")}
+  if(r.amarillas){pts+=r.amarillas*POINTS.amarilla;ev.push(r.amarillas+" amarilla"+(r.amarillas>1?"s":""))}
+  if(r.rojas){pts+=r.rojas*POINTS.roja;ev.push("Roja")}
+  return {pts,ev,ausente:false};
+}
+function compute(){
+  P.forEach(p=>{
+    p.pos=S.pos[p.id]||DEFPOS[p.id]||"MED";
+    p.log=PLAYED.map(m=>({m,...scoreOf(p,m)}));
+    // valor de mercado: sube o baja con cada partido jugado, también J2 y J3
+    let v=VALUE0; p.hist=[VALUE0];
+    p.log.forEach(x=>{
+      x.delta=x.ausente?-0.5:clamp((x.pts-3)*0.25,-1.5,2.5);
+      v=clamp(Math.round((v+x.delta)*10)/10,VALUE_MIN,VALUE_MAX); x.value=v; p.hist.push(v);
+    });
+    p.value=v; p.lastDelta=p.log.length?p.log[p.log.length-1].delta:0;
+    const count=p.log.filter(x=>x.m.jornada>=START_JORNADA);
+    p.fant=sum(count.map(x=>x.pts));            // puntos del fantasy (desde la J4)
+    const pre=p.log.filter(x=>x.m.jornada<START_JORNADA);
+    p.pre=sum(pre.map(x=>x.pts)); p.avg=pre.length?p.pre/pre.length:0;
+    p.pj=p.log.filter(x=>!x.ausente).length;
+    p.hot=p.log.slice(-2).filter(x=>x.pts>=6).length===2;
+  });
+}
+const byId=id=>P.find(p=>p.id===id);
+const faceOf=(p,fb)=>{const u=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]);return u?`<img src="${u}" alt="${p.n}">`:fb};
+
+/* ── Alineación ── */
+function slotPlan(){const f=FORMS[S.form];return ["POR",...Array(f.DEF).fill("DEF"),...Array(f.MED).fill("MED"),...Array(f.DEL).fill("DEL")]}
+function reconcile(){
+  const plan=slotPlan(), old=S.slots.filter(Boolean).map(byId).filter(Boolean), used=new Set(), out=plan.map(()=>null);
+  plan.forEach((pos,i)=>{const c=old.find(p=>p.pos===pos&&!used.has(p.id)); if(c){out[i]=c.id;used.add(c.id)}});
+  S.slots=out; if(!out.includes(S.cap)) S.cap=null;
+}
+const spent=()=>sum(S.slots.filter(Boolean).map(id=>byId(id).value));
+const filled=()=>S.slots.filter(Boolean).length;
+const valid=()=>filled()===7&&spent()<=BUDGET+1e-9&&!!S.cap;
+
+/* ── Iconos ── */
+const I={
+ home:'<svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
+ lineup:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M3 12h4M17 12h4"/><circle cx="12" cy="12" r="2.5"/></svg>',
+ market:'<svg viewBox="0 0 24 24"><path d="M4 17l5-5 4 4 7-8M15 8h5v5"/></svg>',
+ rank:'<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>',
+ liga:'<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>'
+};
+const TABS=[["home","Inicio",I.home],["lineup","Mi 7",I.lineup],["market","Mercado",I.market],["rank","Ranking",I.rank],["liga","Liga",I.liga]];
+let tab="home", rankView="fant", jsel=PLAYED.length?PLAYED[PLAYED.length-1].jornada:null, mfilter="ALL", msort="value";
+
+/* ── Piezas ── */
+function spark(h,cls="spark",w=56,hgt=24){
+  if(h.length<2) return "";
+  const mn=Math.min(...h),mx=Math.max(...h),r=(mx-mn)||1,pad=3;
+  const pts=h.map((v,i)=>[pad+i*(w-2*pad)/(h.length-1),hgt-pad-(v-mn)/r*(hgt-2*pad)]);
+  const up=h[h.length-1]>=h[0], col=up?"var(--up)":"var(--down)", e=pts[pts.length-1];
+  return `<svg class="${cls}" viewBox="0 0 ${w} ${hgt}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.map(p=>p.map(n=>n.toFixed(1)).join(",")).join(" ")}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${e[0].toFixed(1)}" cy="${e[1].toFixed(1)}" r="2.6" fill="${col}"/></svg>`;
+}
+const deltaHtml=d=>`<span class="delta ${d>0.05?"up":d<-0.05?"dn":"eq"}">${d>0.05?"▲":d<-0.05?"▼":"•"} ${Math.abs(d).toFixed(1).replace(".",",")}</span>`;
+const posPill=p=>`<span class="posdot p-${p}">${p}</span>`;
+const standOf=id=>DATA.clasificacion.find(t=>t.id===id);
+const formDots=r=>`<span class="dots" aria-label="Racha">${[...(r||[])].reverse().map(x=>`<i class="dot ${x===1?"w":x===2?"d":"l"}"></i>`).join("")}</span>`;
+function head(){
+  const up=dfmt(DATA.actualizado,{day:"numeric",month:"short"});
+  return `<div class="top"><div><div class="eyebrow">Liga Elite Fútbol · F7 · ${DATA.grupo}</div><h1>Fantasy ${TEAM}</h1></div><span class="badge">Datos del ${up}</span></div>`;
+}
+
+/* ── Vistas ── */
+function viewHome(){
+  const rv=standOf(NEXT.rivalId), me=standOf(TEAM_ID);
+  const L=NEXT.local?[TEAM_ID,TEAM]:[NEXT.rivalId,NEXT.rival], R=NEXT.local?[NEXT.rivalId,NEXT.rival]:[TEAM_ID,TEAM];
+  const ds=dfmt(NEXT.m.fecha,{weekday:"long",day:"numeric",month:"long"});
+  const movers=[...P].filter(p=>p.log.length).sort((a,b)=>b.lastDelta-a.lastDelta);
+  const ups=movers.slice(0,3), dns=movers.slice(-3).reverse();
+  const mv=p=>`<button class="mv" data-player="${p.id}"><div class="av" style="--s:34px">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b>${deltaHtml(p.lastDelta)}</div></button>`;
+  const pct=Math.min(100,spent()/BUDGET*100);
+  return `<section class="glass hero">
+    <div class="eyebrow" style="text-align:center">Jornada ${NEXT.jornada} · ${S.locked?"Tu 7 está confirmado":"Próximo partido"}</div>
+    <div class="vs"><div class="t">${crest(L[0],L[1],58)}<b>${L[1]}</b></div>
+      <div class="mid"><span class="num" style="color:var(--muted)">VS</span></div>
+      <div class="t">${crest(R[0],R[1],58)}<b>${R[1]}</b></div></div>
+    <div class="meta"><span class="pill">${ds}${NEXT.horaOk?", "+NEXT.when.toTimeString().slice(0,5):" · hora por confirmar"}</span>${NEXT.m.campo?`<span class="pill">${NEXT.m.campo}</span>`:""}</div>
+    <div style="text-align:center"><div class="eyebrow">El 7 se cierra en</div><div class="num cd" id="cd">${countdown()}</div></div>
+    ${rv?`<div class="rivalrow"><span>Rival: <b>${rv.pos}º</b> · ${rv.pts} pts · ${rv.gf}-${rv.gc} goles</span>${formDots(rv.racha)}</div>`:""}
+  </section>
+  <section class="glass card">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><h3>Mi 7 para la J${NEXT.jornada}</h3><span class="sub">${filled()}/7 · capitán ${S.cap?byId(S.cap).n:"sin elegir"}</span></div>
+    <div><div class="meter ${spent()>BUDGET?"over":""}"><i style="width:${pct}%"></i></div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px" class="sub"><span>Presupuesto usado ${money(spent())}</span><span>Máximo ${money(BUDGET)}</span></div></div>
+    <button class="btn ${S.locked?"ghost":""}" data-tab="lineup">${S.locked?"Ver o editar mi 7":filled()?"Seguir con mi 7":"Montar mi 7"}</button>
+  </section>
+  <section class="glass"><div class="sec"><h2>Mercado</h2><span class="eyebrow">Tras la J${PLAYED.length?PLAYED[PLAYED.length-1].jornada:"-"}</span></div>
+    <div class="movers"><div style="display:grid;gap:8px"><span class="eyebrow" style="color:var(--up)">Suben</span>${ups.map(mv).join("")}</div>
+    <div style="display:grid;gap:8px"><span class="eyebrow" style="color:var(--down)">Bajan</span>${dns.map(mv).join("")}</div></div></section>
+  ${me?`<section class="glass card"><div class="eyebrow">Truskulus FC en la liga</div><div style="display:flex;align-items:center;gap:12px">${crest(TEAM_ID,TEAM,40)}<div style="flex:1"><b class="num" style="font-size:20px">${me.pos}º de ${DATA.clasificacion.length}</b><div class="sub">${me.pts} pts · ${me.g}G ${me.e}E ${me.p}P · ${me.gf}-${me.gc}</div></div>${formDots(me.racha)}</div></section>`:""}`;
+}
+function slotHtml(i,pos){
+  const p=S.slots[i]?byId(S.slots[i]):null, dis=S.locked||closed();
+  return `<button class="slot ${p?"filled":""}" data-slot="${i}" ${dis?"disabled":""} aria-label="${POS[pos]} ${p?p.n:"vacío"}">
+    ${p&&S.cap===p.id?'<span class="cap">C</span>':""}
+    <span class="shirt">${p?faceOf(p,p.num):"+"}</span><span class="nm">${p?p.n:"Elegir"}</span><span class="ln">${p?money(p.value):pos}</span></button>`;
+}
+function viewLineup(){
+  const plan=slotPlan(), idx={POR:[],DEF:[],MED:[],DEL:[]}; plan.forEach((pos,i)=>idx[pos].push(i));
+  const dis=S.locked||closed(), over=spent()>BUDGET, proj=sum(S.slots.filter(Boolean).map(id=>byId(id).avg*(id===S.cap?2:1)));
+  const pct=Math.min(100,spent()/BUDGET*100);
+  return `<div class="glass seg" role="group" aria-label="Formación">${Object.keys(FORMS).map(f=>`<button data-form="${f}" aria-pressed="${f===S.form}" ${dis?"disabled":""}>${f}</button>`).join("")}</div>
+  <section class="pitch" aria-label="Alineación">
+    ${["DEL","MED","DEF","POR"].map(pos=>`<div class="line">${idx[pos].map(i=>slotHtml(i,pos)).join("")}</div>`).join("")}
+  </section>
+  <section class="glass card">
+    <div><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="eyebrow">Presupuesto</span><b class="num ${over?"neg":""}">${money(spent())} <span class="sub">/ ${money(BUDGET)}</span></b></div>
+    <div class="meter ${over?"over":""}" style="margin-top:8px"><i style="width:${pct}%"></i></div>
+    ${over?'<div class="sub neg" style="margin-top:6px">Te pasas del presupuesto. Cambia a alguien por un jugador más barato.</div>':""}</div>
+    ${filled()?`<div><div class="eyebrow" style="margin-bottom:8px">Capitán (puntúa doble)</div><div class="chipsel">${S.slots.filter(Boolean).map(id=>{const p=byId(id);return `<button data-cap="${id}" aria-pressed="${S.cap===id}" ${dis?"disabled":""}>${p.n}</button>`}).join("")}</div></div>`:""}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div><div class="eyebrow">Proyección</div><div class="num" style="font-size:24px;font-weight:800">${filled()?proj.toFixed(1):"–"} <span class="sub" style="font-weight:500">pts por la media de J2-J3</span></div></div>
+      <div style="display:flex;gap:8px">${S.locked?`<button class="btn ghost" data-act="unlock" ${closed()?"disabled":""}>Editar</button>`:`<button class="btn ghost" data-act="clear" ${filled()?"":"disabled"}>Vaciar</button><button class="btn" data-act="lock" ${valid()&&!closed()?"":"disabled"}>Confirmar 7</button>`}</div>
+    </div>
+  </section>
+  <p class="note">Cada hueco pide su posición. Si no tienes jugadores de una posición, asígnalos en Mercado. Puedes editar hasta el inicio del partido.</p>`;
+}
+function viewMarket(){
+  let r=P.filter(p=>mfilter==="ALL"||p.pos===mfilter);
+  const key={value:p=>p.value,form:p=>p.lastDelta,pts:p=>p.pre}[msort];
+  r=[...r].sort((a,b)=>key(b)-key(a));
+  return `<div class="glass seg" role="group" aria-label="Posición">${[["ALL","Todos"],...Object.keys(POS).map(k=>[k,k])].map(([k,l])=>`<button data-mf="${k}" aria-pressed="${mfilter===k}">${l}</button>`).join("")}</div>
+  <section class="glass"><div class="sec"><h2>Mercado</h2>
+    <div class="chipsel" style="gap:6px">${[["value","Valor"],["form","Racha"],["pts","Puntos"]].map(([k,l])=>`<button data-ms="${k}" aria-pressed="${msort===k}" style="padding:5px 10px;font-size:12px">${l}</button>`).join("")}</div></div>
+   <div class="list">${r.map(p=>`<button class="row" data-player="${p.id}">
+     <div class="av">${faceOf(p,p.num)}</div>
+     <div class="grow"><b>${p.n} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">${posPill(p.pos)} ${p.pj} PJ · ${p.j.goles} G</span></div>
+     ${spark(p.hist)}
+     <div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
+  <p class="note">El valor de cada jugador sube o baja tras cada partido según su rendimiento. Toca un jugador para ver su ficha, cambiar su posición y subir su foto.</p>`;
+}
+function matchLog(m){
+  const rows=P.map(p=>({p,...p.log.find(x=>x.m.matchId===m.matchId)})).sort((a,b)=>b.pts-a.pts);
+  const counts=m.jornada>=START_JORNADA;
+  return `<section class="glass card"><div class="eyebrow">Jornada ${m.jornada} · ${dfmt(m.fecha,{day:"numeric",month:"long"})}</div>
+    <div class="hero" style="padding:0"><div class="vs"><div class="t">${crest(m.localId,m.local,46)}<b>${m.local}</b></div><div class="mid"><span class="num score">${m.golesLocal}–${m.golesVisitante}</span></div><div class="t">${crest(m.visitanteId,m.visitante,46)}<b>${m.visitante}</b></div></div></div>
+    <span class="pill" style="justify-self:center">${counts?"Cuenta para el fantasy":"Pretemporada: calibra el mercado, no suma puntos"}</span></section>
+  <section class="glass"><div class="sec"><h2>Rendimiento</h2><span class="eyebrow">Jornada ${m.jornada}</span></div>
+   <div class="list">${rows.map(({p,ev,pts,ausente,delta})=>`<button class="row" data-player="${p.id}"><div class="av">${faceOf(p,p.num)}</div>
+     <div class="grow"><b>${p.n}</b><div class="chips">${posPill(p.pos)}${ev.map(e=>`<span class="chip ${/amarilla|Roja/.test(e)?"neg":""}">${e}</span>`).join("")}${ausente?'<span class="chip neg">No se presentó</span>':""}</div></div>
+     <div class="val"><div class="pts ${pts<0?"neg":""}" style="${counts?"":"opacity:.55"}">${fmt(pts)}</div>${deltaHtml(delta)}</div></button>`).join("")}</div></section>`;
+}
+function viewRank(){
+  const seg=`<div class="glass seg" role="group" aria-label="Vista"><button data-rv="fant" aria-pressed="${rankView==="fant"}">Fantasy</button><button data-rv="jor" aria-pressed="${rankView==="jor"}">Jornadas</button><button data-rv="reg" aria-pressed="${rankView==="reg"}">Baremo</button></div>`;
+  if(rankView==="reg") return seg+`<section class="glass"><div class="sec"><h2>Baremo</h2><span class="eyebrow">Desde la J${START_JORNADA}</span></div><div class="rules">${RULES.map(([k,v])=>`<span>${k}</span><span>${v}</span>`).join("")}</div></section>
+    <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€."}</p></section>`;
+  if(rankView==="jor"){
+    const segj=`<div class="glass seg" role="group" aria-label="Jornada">${PLAYED.map(x=>`<button data-j="${x.jornada}" aria-pressed="${x.jornada===jsel}">J${x.jornada}</button>`).join("")}</div>`;
+    const m=PLAYED.find(x=>x.jornada===jsel); return seg+segj+(m?matchLog(m):"");
+  }
+  const cloudBoard=CLOUD?viewManagers():null;
+  const rich=[...P].sort((a,b)=>b.value-a.value).slice(0,5);
+  const pre=[...P].sort((a,b)=>b.pre-a.pre).slice(0,5);
+  return seg+(cloudBoard||`<section class="glass empty"><div class="eyebrow">Clasificación del fantasy</div><h2>Todos a cero</h2>
+    <p class="sub" style="margin:0;max-width:30ch">Los puntos empiezan a contar en la Jornada ${START_JORNADA}. Confirma tu 7 antes del partido para entrar en la tabla.</p></section>`)+`
+  <section class="glass"><div class="sec"><h2>Los más caros</h2><span class="eyebrow">Valor de mercado</span></div>
+   <div class="list">${rich.map((p,i)=>`<button class="row" data-player="${p.id}"><span class="rank ${i<3?"top3":""}">${i+1}</span><div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub">${posPill(p.pos)}</span></div><div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
+  <section class="glass"><div class="sec"><h2>Pretemporada</h2><span class="eyebrow">J2 y J3 · no suma</span></div>
+   <div class="list">${pre.map((p,i)=>`<button class="row" data-player="${p.id}"><span class="rank ${i<3?"top3":""}">${i+1}</span><div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub">${p.log.map(x=>fmt(x.pts)).join("  ")}</span></div><div class="pts">${p.pre}</div></button>`).join("")}</div></section>`;
+}
+function viewLiga(){
+  const t=DATA.clasificacion;
+  const ms=[...DATA.partidos].filter(m=>!m.descansa).sort((a,b)=>a.jornada-b.jornada);
+  const row=m=>{const done=m.estado===5;return `<div class="matchrow"><div class="tm">${crest(m.localId,m.local,28)}<span>${m.local}</span></div>
+    <div class="mid">${done?`${m.golesLocal}–${m.golesVisitante}`:"vs"}<small>J${m.jornada} · ${dfmt(m.fecha,{day:"numeric",month:"short"})}</small></div>
+    <div class="tm r"><span>${m.visitante}</span>${crest(m.visitanteId,m.visitante,28)}</div></div>`};
+  return `<section class="glass"><div class="sec"><h2>Clasificación</h2><span class="eyebrow">${DATA.grupo}</span></div>
+   <div class="tablewrap"><table><thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>DG</th><th>Pts</th></tr></thead><tbody>
+   ${t.map(x=>`<tr class="${x.id===TEAM_ID?"me":""}"><td>${x.pos}</td><td><span class="tn">${crest(x.id,x.nombre,26)}<span>${x.nombre}</span></span></td><td>${x.pj}</td><td>${fmt(x.gf-x.gc)}</td><td><b>${x.pts}</b></td></tr>`).join("")}</tbody></table></div></section>
+  <section class="glass"><div class="sec"><h2>Calendario</h2><span class="eyebrow">Truskulus FC</span></div>${ms.map(row).join("")}</section>`;
+}
+function profile(id){
+  const p=byId(id), up=p.value-VALUE0;
+  return `<div class="grab"></div><div class="profile">
+    ${canEdit(p)?`<label class="avbtn"><div class="av bigav">${faceOf(p,p.num)}</div><span class="cam">Cambiar foto</span><input type="file" accept="image/*" data-photo="${p.id}" aria-label="Foto de ${p.n}"></label>`:`<div class="av bigav">${faceOf(p,p.num)}</div>`}
+    <div><h2>${p.full}</h2><div class="sub">${p.n} · #${p.num}${p.hot?" · en racha":""}</div></div>
+    ${canEdit(p)?`<div class="chipsel" role="group" aria-label="Posición">${Object.keys(POS).map(k=>`<button data-setpos="${p.id}:${k}" aria-pressed="${p.pos===k}">${POS[k]}</button>`).join("")}</div>`:posPill(p.pos)}
+    <div class="stats"><div class="stat"><b>${money(p.value)}</b><span class="sub">Valor</span></div><div class="stat"><b>${p.pj}</b><span class="sub">Partidos</span></div><div class="stat"><b>${p.j.goles}</b><span class="sub">Goles</span></div><div class="stat"><b>${p.j.asistencias}</b><span class="sub">Asist.</span></div></div>
+    <div style="width:100%;text-align:left"><div class="eyebrow">Evolución del valor</div>${spark(p.hist,"bigspark",300,80)}<div class="sub">Desde ${money(VALUE0)} · <span class="${up>=0?"":"neg"}">${fmt(+up.toFixed(1))} M€</span></div></div>
+    <div style="width:100%;text-align:left" class="list">${p.log.map(x=>`<div class="row" style="padding:10px 0"><div class="grow"><b>J${x.m.jornada} · ${x.m.esLocal?x.m.visitante:x.m.local}</b><div class="chips">${x.ev.map(e=>`<span class="chip">${e}</span>`).join("")}${x.ausente?'<span class="chip neg">No se presentó</span>':""}</div></div><div class="val"><div class="pts ${x.pts<0?"neg":""}">${fmt(x.pts)}</div>${deltaHtml(x.delta)}</div></div>`).join("")||'<p class="sub">Aún sin partidos.</p>'}</div>
+    ${CLOUD&&ME&&ME.player_id===p.id?'<button class="btn ghost" data-act="logout" style="width:100%">Cerrar sesión</button>':""}
+    <button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`;
+}
+function pickSheet(i){
+  const pos=slotPlan()[i], used=new Set(S.slots.filter((x,j)=>x&&j!==i)), room=BUDGET-(spent()-(S.slots[i]?byId(S.slots[i]).value:0));
+  const list=P.filter(p=>p.pos===pos).sort((a,b)=>b.value-a.value);
+  return `<div class="grab"></div><div class="sec"><h2>Elige tu ${POS[pos].toLowerCase()}</h2><span class="sub">Te quedan ${money(Math.max(0,room))} · <button data-act="close" style="color:var(--accent);font-weight:700">Cerrar</button></span></div>
+   <div class="list">${list.map(p=>{const no=used.has(p.id)||p.value>room+1e-9;return `<button class="row" data-pick="${p.id}" ${no?"disabled":""}>
+     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub">${p.pj} PJ · media ${p.avg.toFixed(1)} pts${p.value>room+1e-9?" · no cabe":""}</span></div>
+     ${spark(p.hist)}<div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`}).join("")||'<p class="sub" style="padding:16px">Nadie juega de '+POS[pos].toLowerCase()+'. Asigna posiciones en Mercado.</p>'}
+   ${S.slots[i]?'<button class="row" data-pick="0"><div class="grow"><b class="neg">Quitar jugador</b></div></button>':""}</div>`;
+}
+
+/* ── Render e interacción ── */
+function render(){
+  const gate=CLOUD&&!ME;
+  document.getElementById("app").innerHTML=gate?viewLogin():head()+({home:viewHome,lineup:viewLineup,market:viewMarket,rank:viewRank,liga:viewLiga})[tab]();
+  document.querySelector(".tabs").hidden=gate;
+  document.getElementById("tabs").innerHTML=TABS.map(([k,l,ic])=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab===k}">${ic}${l}</button>`).join("");
+}
+function sheet(html){document.getElementById("layer").innerHTML=html?`<div class="scrim" data-act="close"><div class="sheet glass" role="dialog">${html}</div></div>`:""}
+let pickIdx=null;
+function resizePhoto(file,cb){
+  const img=new Image(), url=URL.createObjectURL(file);
+  img.onload=()=>{const s=192,c=document.createElement("canvas");c.width=c.height=s;
+    const side=Math.min(img.width,img.height);c.getContext("2d").drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,s,s);
+    URL.revokeObjectURL(url);cb(c.toDataURL("image/jpeg",.82))};
+  img.src=url;
+}
+document.addEventListener("change",e=>{
+  const f=e.target.closest("[data-photo]"); if(!f||!f.files[0])return;
+  resizePhoto(f.files[0],async d=>{
+    if(CLOUD){const{error}=await sb.from("members").update({photo:d}).eq("id",ME.id);if(error){toast("No se pudo subir la foto");return}ME.photo=d}
+    S.photos[f.dataset.photo]=d;persist();render();sheet(profile(+f.dataset.photo));
+  });
+});
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-form],[data-cap],[data-mf],[data-ms],[data-rv],[data-player],[data-setpos]"); if(!t)return;
+  const d=t.dataset;
+  if(d.act==="close"){ if(t.classList.contains("scrim")&&e.target.closest(".sheet"))return; sheet(""); return }
+  if(d.tab){tab=d.tab;sheet("");render();window.scrollTo(0,0)}
+  else if(d.player){sheet(profile(+d.player))}
+  else if(d.setpos){setPos(...d.setpos.split(":"))}
+  else if(d.slot!==undefined&&!t.disabled){pickIdx=+d.slot;sheet(pickSheet(pickIdx))}
+  else if(d.pick!==undefined&&!t.disabled){S.slots[pickIdx]=+d.pick||null;if(!S.slots.includes(S.cap))S.cap=null;persist();sheet("");render()}
+  else if(d.form&&!t.disabled){S.form=d.form;reconcile();persist();render()}
+  else if(d.cap&&!t.disabled){S.cap=+d.cap;persist();render()}
+  else if(d.mf){mfilter=d.mf;render()}
+  else if(d.ms){msort=d.ms;render()}
+  else if(d.rv){rankView=d.rv;render()}
+  else if(d.j){jsel=+d.j;render()}
+  else if(d.act==="lock"){S.locked=true;persist();render()}
+  else if(d.act==="unlock"){S.locked=false;persist();render()}
+  else if(d.act==="logout"){logout()}
+  else if(d.join){sheet(joinSheet(+d.join))}
+  else if(d.act==="clear"){S.slots=slotPlan().map(()=>null);S.cap=null;persist();render()}
+});
+async function setPos(id,pos){
+  if(CLOUD){const{error}=await sb.from("members").update({pos}).eq("id",ME.id);if(error){toast("No se pudo guardar la posición");return}ME.pos=pos}
+  S.pos[id]=pos;compute();reconcile();persist();render();sheet(profile(+id));
+}
+function viewLogin(){
+  if(booting) return `<section class="glass empty"><h2>Cargando…</h2></section>`;
+  const claimed=new Set(CLAIMED);
+  return `<div class="top"><div><div class="eyebrow">Liga Elite Fútbol · F7 · ${DATA.grupo}</div><h1>Fantasy ${TEAM}</h1></div></div>
+  <section class="glass card" style="text-align:center;justify-items:center">${crest(TEAM_ID,TEAM,72)}<h2>¿Quién eres?</h2>
+    <p class="sub" style="margin:0;max-width:32ch">Elige tu ficha. La primera vez creas un PIN de 4 cifras; después lo escribes para entrar.</p></section>
+  <section class="glass"><div class="list">${[...P].sort((a,b)=>a.num-b.num).map(p=>`<button class="row" data-join="${p.id}"><div class="av">${faceOf(p,p.num)}</div>
+    <div class="grow"><b>${p.n}</b><span class="sub">${p.full} · #${p.num}</span></div>
+    <span class="posdot ${claimed.has(p.id)?"":"p-MED"}" style="${claimed.has(p.id)?"background:var(--muted)":""}">${claimed.has(p.id)?"ENTRAR":"LIBRE"}</span></button>`).join("")}</div></section>`;
+}
+function joinSheet(pid){
+  const p=byId(pid), claimed=CLAIMED.includes(pid);
+  return `<div class="grab"></div><form class="profile" data-login="${pid}" autocomplete="off">
+    <div class="av bigav">${faceOf(p,p.num)}</div><div><h2>${p.full}</h2><div class="sub">${claimed?"Escribe tu PIN":"Primera vez: crea tu PIN de 4 cifras"}</div></div>
+    <input class="field" id="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="••••" aria-label="PIN" required>
+    ${authErr?`<div class="sub neg" role="alert">${authErr}</div>`:""}
+    <button class="btn" type="submit" style="width:100%">${claimed?"Entrar":"Crear mi acceso"}</button>
+    <button class="btn ghost" type="button" data-act="close" style="width:100%">Cancelar</button></form>`;
+}
+document.addEventListener("submit",async e=>{
+  const f=e.target.closest("[data-login]"); if(!f)return; e.preventDefault();
+  const pid=+f.dataset.login, pin=f.querySelector("#pin").value, claimed=CLAIMED.includes(pid);
+  authErr=""; if(!/^\d{4}$/.test(pin)){authErr="El PIN son 4 cifras.";sheet(joinSheet(pid));return}
+  const creds={email:mail(pid),password:"pin-"+pin+"-fantasy"};
+  let r=claimed?await sb.auth.signInWithPassword(creds):await sb.auth.signUp({...creds,options:{data:{player_id:pid}}});
+  if(!r.error&&!r.data.session) r=await sb.auth.signInWithPassword(creds);
+  if(r.error){authErr=claimed?"PIN incorrecto.":"No se pudo crear el acceso: "+r.error.message;sheet(joinSheet(pid));return}
+  await loadCloud(); sheet(""); render();
+});
+async function logout(){await sb.auth.signOut();ME=null;S.slots=[];S.cap=null;S.locked=false;CLAIMED=(await sb.rpc("claimed_players")).data||[];sheet("");render()}
+async function loadCloud(){
+  const[ms,js,ls,u]=await Promise.all([sb.from("members").select("id,player_id,pos,photo"),sb.from("jornadas").select("jornada,kickoff"),
+    sb.from("lineups").select("member_id,jornada,formation,slots,captain,confirmed"),sb.auth.getUser()]);
+  MEMBERS=ms.data||[]; LINEUPS=(ls.data||[]).map(l=>({...l,slots:(l.slots||[]).map(x=>x||null)}));
+  const k=(js.data||[]).find(j=>j.jornada===NEXT.jornada); if(k){NEXT.when=new Date(k.kickoff);NEXT.horaOk=true}
+  S.pos={};S.photos={}; MEMBERS.forEach(m=>{if(m.pos)S.pos[m.player_id]=m.pos;if(m.photo)S.photos[m.player_id]=m.photo});
+  const uid=u.data&&u.data.user&&u.data.user.id; ME=MEMBERS.find(m=>m.id===uid)||null;
+  const mine=LINEUPS.find(l=>l.member_id===uid&&l.jornada===NEXT.jornada);
+  if(mine){S.form=mine.formation;S.slots=mine.slots;S.cap=mine.captain||null;S.locked=!!mine.confirmed}
+  compute(); reconcile();
+}
+async function saveLineup(){
+  if(!ME)return;
+  const row={member_id:ME.id,jornada:NEXT.jornada,formation:S.form,slots:S.slots.map(x=>x||0),captain:S.cap||null,confirmed:S.locked};
+  const{error}=await sb.from("lineups").upsert(row,{onConflict:"member_id,jornada"});
+  toast(error?(closed()?"El 7 ya está cerrado":"No se pudo guardar. Inténtalo otra vez"):(S.locked?"7 confirmado":"Guardado"));
+}
+function lineupPoints(l){
+  const m=PLAYED.find(x=>x.jornada===l.jornada); if(!m)return null;
+  return sum(l.slots.filter(Boolean).map(id=>{const p=byId(id),x=p&&p.log.find(y=>y.m.matchId===m.matchId);return x?x.pts*(id===l.captain?2:1):0}));
+}
+function standings(){
+  const by=new Map(MEMBERS.map(m=>[m.id,{m,p:byId(m.player_id),total:0,last:null,lj:0}]));
+  LINEUPS.filter(l=>l.confirmed&&l.jornada>=START_JORNADA).forEach(l=>{
+    const pts=lineupPoints(l),r=by.get(l.member_id); if(pts==null||!r)return;
+    r.total+=pts; if(l.jornada>r.lj){r.lj=l.jornada;r.last=pts}
+  });
+  return [...by.values()].filter(r=>r.p).sort((a,b)=>b.total-a.total||a.p.n.localeCompare(b.p.n));
+}
+function viewManagers(){
+  const r=standings(), any=r.some(x=>x.lj);
+  const head=`<section class="glass"><div class="sec"><h2>Clasificación del fantasy</h2><span class="eyebrow">${MEMBERS.length} de ${P.length} dentro</span></div>`;
+  const rows=r.map((x,i)=>`<div class="row ${x.m.id===(ME&&ME.id)?"me":""}"><span class="rank ${any&&i<3?"top3":""}">${i+1}</span><div class="av">${faceOf(x.p,x.p.num)}</div>
+    <div class="grow"><b>${x.p.n}</b><span class="sub">${x.lj?"Última jornada "+fmt(x.last):"Sin jornadas todavía"}</span></div><div class="pts">${x.total}</div></div>`).join("");
+  return head+(any?"":`<p class="sub" style="padding:0 16px">Los puntos empiezan a contar en la Jornada ${START_JORNADA}. Confirma tu 7 antes del partido.</p>`)+`<div class="list">${rows}</div></section>`;
+}
+async function cloudStart(){
+  try{
+    sb=window.supabase.createClient(CFG.url,CFG.key);
+    CLAIMED=(await sb.rpc("claimed_players")).data||[];
+    const{data:{session}}=await sb.auth.getSession(); if(session) await loadCloud();
+  }catch(err){console.warn(err);toast("Sin conexión con el servidor")}
+  booting=false; render();
+}
+setInterval(()=>{const c=document.getElementById("cd");if(c)c.textContent=countdown()},30000);
+compute(); reconcile(); render();
+if(CLOUD) cloudStart();
+</script>

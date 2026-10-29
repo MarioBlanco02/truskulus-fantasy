@@ -1,0 +1,57 @@
+name: Actualizar y publicar
+
+on:
+  schedule:
+    - cron: "0 7 * * 2"        # cada martes a las 07:00 UTC (08:00 o 09:00 en Madrid)
+  workflow_dispatch:           # botón "Run workflow" para actualizar a mano
+  push:
+    branches: [main]
+    paths: [template.html, build.py, scrape.py, scripts/**, .github/workflows/**]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pillow
+      - name: Descargar datos de Liga Elite
+        run: python scrape.py data.json
+      - name: Guardar horarios de las jornadas en Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/sync_jornadas.py
+      - name: Generar la web
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python build.py
+      - name: Guardar data.json si ha cambiado
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.json
+          git diff --cached --quiet || (git commit -m "Datos actualizados" && git push)
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
