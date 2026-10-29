@@ -219,7 +219,8 @@ const TEAM = DATA.equipo, TEAM_ID = DATA.equipoId;
 /* ── Reglas del juego ── */
 const VOTE_DAYS = 3, EVENT_DAYS = 7;   // plazo para votar el MVP y para apuntar eventos, desde el inicio del partido
 const START_JORNADA = 4;           // los puntos del fantasy empiezan a contar aquí; J2 y J3 solo calibran el mercado
-const BUDGET = 34;                 // M€ para el 7 inicial
+const BUDGET_FACTOR = 1.05;        // el presupuesto es el coste medio de 7 jugadores +5 %, y se recalcula con el mercado
+let BUDGET = 39;                   // M€ para el 7 inicial (se ajusta en computeBudget)
 const VALUE0 = 5.0, VALUE_MIN = 1.0, VALUE_MAX = 25;
 const MVP_BONUS = [3,2,1];          // 1.º, 2.º y 3.º más votados del partido
 const POINTS = {juega:2, gol:4, golDEF:2, golPOR:4, asist:3, porteria:3, mvp:3, amarilla:-1, roja:-3, ausente:-3};
@@ -344,6 +345,11 @@ function compute(){
     p.pj=p.log.filter(x=>!x.ausente&&!x.lesion).length;
     p.hot=p.log.slice(-2).filter(x=>x.pts>=6).length===2;
   });
+  computeBudget();
+}
+function computeBudget(){
+  const v=P.filter(p=>!p.hurt).map(p=>p.value);
+  BUDGET=Math.round(sum(v)/v.length*7*BUDGET_FACTOR*2)/2;
 }
 const byId=id=>P.find(p=>p.id===id);
 const faceOf=(p,fb)=>{const u=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]);return u?`<img src="${u}" alt="${p.n}">`:fb};
@@ -439,6 +445,7 @@ function viewLineup(){
   <section class="glass card">
     <div><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="eyebrow">Presupuesto</span><b class="num ${over?"neg":""}">${money(spent())} <span class="sub">/ ${money(BUDGET)}</span></b></div>
     <div class="meter ${over?"over":""}" style="margin-top:8px"><i style="width:${pct}%"></i></div>
+    ${!over&&filled()<7?`<div class="sub" style="margin-top:6px">Te quedan ${money(BUDGET-spent())} para ${7-filled()} ${7-filled()===1?"hueco":"huecos"}</div>`:""}
     ${over?'<div class="sub neg" style="margin-top:6px">Te pasas del presupuesto. Cambia a alguien por un jugador más barato.</div>':""}</div>
     ${filled()?`<div><div class="eyebrow" style="margin-bottom:8px">Capitán (puntúa doble)</div><div class="chipsel">${S.slots.filter(Boolean).map(id=>{const p=byId(id);return `<button data-cap="${id}" aria-pressed="${S.cap===id}" ${dis?"disabled":""}>${p.n}</button>`}).join("")}</div></div>`:""}
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -556,10 +563,13 @@ function profile(id){
     <button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`;
 }
 function pickSheet(i){
-  const pos=slotPlan()[i], used=new Set(S.slots.filter((x,j)=>x&&j!==i)), room=BUDGET-(spent()-(S.slots[i]?byId(S.slots[i]).value:0));
-  const why=p=>p.hurt?"Lesionado":(GK_ONLY.includes(p.id)&&pos!=="POR")?"Solo portero":used.has(p.id)?"Ya en tu 7":p.value>room+1e-9?"No cabe":"";
+  const pos=slotPlan()[i], used=new Set(S.slots.filter((x,j)=>x&&j!==i)), base=BUDGET-(spent()-(S.slots[i]?byId(S.slots[i]).value:0));
+  const empties=S.slots.filter((x,j)=>!x&&j!==i).length, pool=P.filter(p=>!p.hurt&&!used.has(p.id));
+  // lo mínimo que costaría completar el resto del 7 con los más baratos que queden
+  const reserve=c=>sum(pool.filter(p=>p.id!==c.id).map(p=>p.value).sort((a,b)=>a-b).slice(0,empties));
+  const why=p=>p.hurt?"Lesionado":(GK_ONLY.includes(p.id)&&pos!=="POR")?"Solo portero":used.has(p.id)?"Ya en tu 7":p.value>base+1e-9?"No cabe":p.value+reserve(p)>base+1e-9?"Dejaría sin presupuesto al resto":"";
   const list=[...P].sort((a,b)=>b.value-a.value);
-  return `<div class="grab"></div><div class="sec"><h2>Elige tu ${POS[pos].toLowerCase()}</h2><span class="sub">Te quedan ${money(Math.max(0,room))} · <button data-act="close" style="color:var(--accent);font-weight:700">Cerrar</button></span></div>
+  return `<div class="grab"></div><div class="sec"><h2>Elige tu ${POS[pos].toLowerCase()}</h2><span class="sub">Te quedan ${money(Math.max(0,base))}${empties?" para "+(empties+1)+" huecos":""} · <button data-act="close" style="color:var(--accent);font-weight:700">Cerrar</button></span></div>
    <div class="list">${list.map(p=>{const no=why(p);return `<button class="row" data-pick="${p.id}" ${no?"disabled":""}>
      <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub" style="white-space:nowrap">${no?no:"#"+p.num+" · "+p.pj+" PJ · media "+p.avg.toFixed(1)+" pts"}</span></div>
      ${spark(p.hist)}<div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`}).join("")}

@@ -12,7 +12,7 @@ Fantasy interno del equipo. Los datos salen de Liga Elite Fútbol (API pública,
 | `scripts/sync_jornadas.py` | Sube a Supabase la hora de inicio de cada jornada. |
 | `.github/workflows/actualizar.yml` | **Cada martes** actualiza los datos y vuelve a publicar la web. También se lanza a mano. |
 
-Reglas del juego: puntos desde la J4, presupuesto de 34 M€, capitán x2, valor de mercado que se mueve tras cada partido. Se cambian al principio de `template.html` (`START_JORNADA`, `BUDGET`, `POINTS`).
+Reglas del juego: puntos desde la J4, presupuesto = coste medio de 7 jugadores +5 % (se recalcula con el mercado), capitán x2, valor de mercado que se mueve tras cada partido. Se cambian al principio de `template.html` (`START_JORNADA`, `BUDGET`, `POINTS`).
 
 ## Eventos y votación MVP
 
