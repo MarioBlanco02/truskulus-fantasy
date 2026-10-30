@@ -69,7 +69,7 @@ h3{font-size:16px;font-weight:700}
   background:var(--glass-strong);border:1px solid var(--edge-dim);flex:none;overflow:hidden;position:relative}
 .av img{width:100%;height:100%;object-fit:cover;display:block}
 .posdot{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:99px;color:#fff}
-.p-POR{background:#e0912b}.p-DEF{background:#3b82f6}.p-MED{background:#16a765}.p-DEL{background:#e5484d}
+.p-POR{background:#e0912b}.p-DEF{background:#3b82f6}.p-LAT{background:#0e9bb5}.p-MED{background:#16a765}.p-EXT{background:#9b5de5}.p-DEL{background:#e5484d}
 
 /* hero partido */
 .hero{padding:20px 18px 16px;display:grid;gap:16px;position:relative;overflow:hidden}
@@ -223,12 +223,27 @@ const BUDGET_FACTOR = 1.05;        // el presupuesto es el coste medio de 7 juga
 let BUDGET = 39;                   // M€ para el 7 inicial (se ajusta en computeBudget)
 const VALUE0 = 5.0, VALUE_MIN = 1.0, VALUE_MAX = 25;
 const MVP_BONUS = [3,2,1];          // 1.º, 2.º y 3.º más votados del partido
+const MAX_ENCAJADOS = 2;           // "portería a cero" cuenta si encajamos 2 goles o menos
 const POINTS = {juega:2, gol:4, golDEF:2, golPOR:4, asist:3, porteria:3, mvp:3, amarilla:-1, roja:-3, ausente:-3};
-const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol jugando de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero (de POR o DEF)","+3"],["MVP (el más votado)","+3"],["2.º más votado","+2"],["3.º más votado","+1"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
-const POS = {POR:"Portero",DEF:"Defensa",MED:"Medio",DEL:"Delantero"};
-const FORMS = {"2-3-1":{DEF:2,MED:3,DEL:1},"3-2-1":{DEF:3,MED:2,DEL:1},"2-2-2":{DEF:2,MED:2,DEL:2},"3-1-2":{DEF:3,MED:1,DEL:2},"1-3-2":{DEF:1,MED:3,DEL:2}};
-// En tu 7 cualquiera puede jugar en cualquier hueco; la posición cuenta según el hueco donde lo pongas.
-const GK_ONLY = [9003];            // Arturo: solo puede ir de portero
+const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol jugando de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero: 2 goles o menos (de POR o DEF)","+3"],["MVP (el más votado)","+3"],["2.º más votado","+2"],["3.º más votado","+1"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
+const POS = {POR:"Portero",DEF:"Defensa",LAT:"Lateral",MED:"Centrocampista",EXT:"Extremo",DEL:"Delantero"};
+const POS_CORTO = {POR:"POR",DEF:"DEF",LAT:"LAT",MED:"MED",EXT:"EXT",DEL:"DEL"};
+// Cada jugador tiene 1 o 2 posiciones (clave: nombre y apellido sin tildes). Se cambian aquí y se publica.
+const POSICIONES = {
+  "arturo torres":["POR"], "mario blanco":["MED","LAT"], "adrian carmena":["DEF","DEL"], "adrian exposito":["MED"],
+  "mario jimeno":["LAT"], "ruben san felipe":["DEF"], "guillermo duran":["MED","LAT"], "mario secilla":["MED","LAT"],
+  "adrian sanchez":["DEF"], "jorge perez":["DEF","MED"], "jorge rodriguez":["LAT","EXT"], "jaime montero":["MED","DEL"],
+  "guillermo garrido":["DEL","MED"], "alejandro sanchez":["MED"], "mario camacho":["MED"]   // Camacho: provisional
+};
+// Huecos de cada formación. MEDB = interior por la banda (admite lateral y extremo); MEDC = centrocampista de centro.
+const FORMS = {
+  "2-3-1":["POR","DEF","DEF","MEDB","MEDC","MEDB","DEL"], "3-2-1":["POR","DEF","DEF","DEF","MEDC","MEDC","DEL"],
+  "2-2-2":["POR","DEF","DEF","MEDB","MEDB","DEL","DEL"], "3-1-2":["POR","DEF","DEF","DEF","MEDC","DEL","DEL"],
+  "1-3-2":["POR","DEF","MEDB","MEDC","MEDB","DEL","DEL"]
+};
+const ROLE_OK = {POR:["POR"], DEF:["DEF","LAT"], MEDC:["MED"], MEDB:["MED","LAT","EXT"], DEL:["DEL","EXT"]};
+const ROLE_NAME = {POR:"portero", DEF:"defensa", MEDC:"centrocampista", MEDB:"interior por la banda", DEL:"delantero"};
+const base0=r=>r==="MEDC"||r==="MEDB"?"MED":r;
 const INJ_DEFAULT = [{player_id:9003,since:2,until:null}];   // Arturo, lesionado; en modo equipo se guarda en Supabase
 
 /* ── Utilidades ── */
@@ -304,7 +319,8 @@ function countdown(){
 }
 
 /* ── Puntuación, valor de mercado y rendimiento ── */
-const P = DATA.jugadores.map(j=>({id:j.userId,n:short(j),full:j.nombre+" "+j.apellido,num:j.dorsal,j}));
+const norm=t=>t.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+const P = DATA.jugadores.map(j=>({id:j.userId,n:short(j),full:j.nombre+" "+j.apellido,num:j.dorsal,j,pos:POSICIONES[norm(j.nombre+" "+j.apellido)]||["MED"]}));
 function scoreOf(p,m){
   const r=(DATA.estadisticas[m.matchId]||[]).find(x=>x.userId===p.id);
   if(!r||!r.jugo) return injuredAt(p.id,m.jornada)?{pts:0,ev:["Lesionado"],ausente:false,lesion:true}:{pts:POINTS.ausente,ev:[],ausente:true};
@@ -318,7 +334,7 @@ function scoreOf(p,m){
   if(vv){pts+=vv.bonus;ev.push(vv.lugar===1?"MVP":vv.lugar+".º más votado")}
   if(amar){pts+=amar*POINTS.amarilla;ev.push(amar+" amarilla"+(amar>1?"s":""))}
   if(roja){pts+=roja*POINTS.roja;ev.push(roja>1?roja+" rojas":"Roja")}
-  return {pts,ev,ausente:false,goles:r.goles,cs:conc===0};
+  return {pts,ev,ausente:false,goles:r.goles,cs:conc<=MAX_ENCAJADOS};
 }
 // Bonus por el hueco en que el compañero coloca al jugador: gol de defensa/portero y portería a cero
 function slotBonus(x,pos){
@@ -355,12 +371,33 @@ const byId=id=>P.find(p=>p.id===id);
 const faceOf=(p,fb)=>{const u=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]);return u?`<img src="${u}" alt="${p.n}">`:fb};
 
 /* ── Alineación ── */
-const planFor=fm=>{const f=FORMS[fm];return ["POR",...Array(f.DEF).fill("DEF"),...Array(f.MED).fill("MED"),...Array(f.DEL).fill("DEL")]};
+const planFor=fm=>FORMS[fm].map(base0);
 const slotPlan=()=>planFor(S.form);
+const slotRole=i=>FORMS[S.form][i];
+function eligible(p,role){
+  if(p.hurt) return false;
+  if(role==="POR"){                                   // con el portero lesionado, vale cualquier jugador de campo
+    const natural=P.filter(x=>x.pos.includes("POR")&&!x.hurt);
+    return natural.length?p.pos.includes("POR"):true;
+  }
+  return p.pos.some(x=>ROLE_OK[role].includes(x));
+}
+// ¿se pueden rellenar estos huecos con jugadores libres por no más de "limit" M€?
+function canFill(idxs,used,limit){
+  const roles=idxs.map(slotRole), cands=roles.map(r=>P.filter(p=>eligible(p,r)&&!used.has(p.id)).sort((a,b)=>a.value-b.value));
+  const order=[...roles.keys()].sort((a,b)=>cands[a].length-cands[b].length), taken=new Set(used);
+  let ok=false;
+  (function go(k,cost){
+    if(ok||cost>limit+1e-9) return;
+    if(k===order.length){ok=true;return}
+    for(const p of cands[order[k]]){ if(taken.has(p.id)) continue; taken.add(p.id); go(k+1,cost+p.value); taken.delete(p.id); if(ok) return }
+  })(0,0);
+  return ok;
+}
 function reconcile(){
-  const seen=new Set(), out=slotPlan().map((pos,i)=>{
+  const seen=new Set(), out=FORMS[S.form].map((role,i)=>{
     const id=S.slots[i], p=id&&byId(id);
-    if(!p||p.hurt||seen.has(id)||(GK_ONLY.includes(id)&&pos!=="POR")) return null;
+    if(!p||seen.has(id)||!eligible(p,role)) return null;
     seen.add(id); return id;
   });
   S.slots=out; if(!out.includes(S.cap)) S.cap=null;
@@ -453,7 +490,7 @@ function viewLineup(){
       <div style="display:flex;gap:8px">${S.locked?`<button class="btn ghost" data-act="unlock" ${closed()?"disabled":""}>Editar</button>`:`<button class="btn ghost" data-act="clear" ${filled()?"":"disabled"}>Vaciar</button><button class="btn" data-act="lock" ${valid()&&!closed()?"":"disabled"}>Confirmar 7</button>`}</div>
     </div>
   </section>
-  <p class="note">En cada hueco puede jugar cualquiera, salvo Arturo, que solo es portero. La posición cuenta según el hueco donde pongas al jugador: gol de defensa +2 extra, de portero +4, y portería a cero +3 para portero y defensas. Puedes editar hasta el inicio del partido.</p>`;
+  <p class="note">Cada jugador tiene sus posiciones: el lateral juega de defensa o de interior por la banda, y el extremo de delantero o de interior. La posición cuenta según el hueco: gol de defensa +2 extra, de portero +4, y portería a cero (2 goles o menos) +3 para portero y defensas. Puedes editar hasta el inicio del partido.</p>`;
 }
 function viewMarket(){
   let r=P.filter(p=>mfilter==="ALL"||(mfilter==="HURT"?p.hurt:!p.hurt));
@@ -464,7 +501,7 @@ function viewMarket(){
     <div class="chipsel" style="gap:6px">${[["value","Valor"],["form","Racha"],["pts","Puntos"]].map(([k,l])=>`<button data-ms="${k}" aria-pressed="${msort===k}" style="padding:5px 10px;font-size:12px">${l}</button>`).join("")}</div></div>
    <div class="list">${r.map(p=>`<button class="row" data-player="${p.id}">
      <div class="av">${faceOf(p,p.num)}</div>
-     <div class="grow"><b>${p.n} ${p.hurt?'<span class="posdot" style="background:var(--warn)">LESIONADO</span>':""} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">#${p.num} · ${p.pj} PJ · ${p.j.goles} G</span></div>
+     <div class="grow"><b>${p.n} ${p.hurt?'<span class="posdot" style="background:var(--warn)">LESIONADO</span>':""} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">${posPills(p)} ${p.pj} PJ · ${p.j.goles} G</span></div>
      ${spark(p.hist)}
      <div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
   <p class="note">El valor de cada jugador sube o baja tras cada partido según su rendimiento. Toca un jugador para ver su ficha, marcarlo como lesionado o cambiar su foto.</p>`;
@@ -554,7 +591,7 @@ function profile(id){
   return `<div class="grab"></div><div class="profile">
     ${canEdit(p)?`<label class="avbtn"><div class="av bigav">${faceOf(p,p.num)}</div><span class="cam">Cambiar foto</span><input type="file" accept="image/*" data-photo="${p.id}" aria-label="Foto de ${p.n}"></label>`:`<div class="av bigav">${faceOf(p,p.num)}</div>`}
     <div><h2>${p.full}</h2><div class="sub">${p.n} · #${p.num}${p.hot?" · en racha":""}</div></div>
-    ${GK_ONLY.includes(p.id)?'<div class="sub">Portero fijo: solo puede jugar de portero</div>':""}
+    <div class="chipsel" style="justify-content:center">${p.pos.map(x=>`<span class="posdot p-${x}" style="font-size:12px;padding:4px 10px">${POS[x]}</span>`).join("")}</div>
     ${injuryBox(p)}
     <div class="stats"><div class="stat"><b>${money(p.value)}</b><span class="sub">Valor</span></div><div class="stat"><b>${p.pj}</b><span class="sub">Partidos</span></div><div class="stat"><b>${p.j.goles}</b><span class="sub">Goles</span></div><div class="stat"><b>${p.j.asistencias}</b><span class="sub">Asist.</span></div></div>
     <div style="width:100%;text-align:left"><div class="eyebrow">Evolución del valor</div>${spark(p.hist,"bigspark",300,80)}<div class="sub">Desde ${money(VALUE0)} · <span class="${up>=0?"":"neg"}">${fmt(+up.toFixed(1))} M€</span></div></div>
@@ -562,17 +599,18 @@ function profile(id){
     ${CLOUD&&ME&&ME.player_id===p.id?'<button class="btn ghost" data-act="logout" style="width:100%">Cerrar sesión</button>':""}
     <button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`;
 }
+const posPills=p=>p.pos.map(x=>`<span class="posdot p-${x}">${POS_CORTO[x]}</span>`).join(" ");
 function pickSheet(i){
-  const pos=slotPlan()[i], used=new Set(S.slots.filter((x,j)=>x&&j!==i)), base=BUDGET-(spent()-(S.slots[i]?byId(S.slots[i]).value:0));
-  const empties=S.slots.filter((x,j)=>!x&&j!==i).length, pool=P.filter(p=>!p.hurt&&!used.has(p.id));
-  // lo mínimo que costaría completar el resto del 7 con los más baratos que queden
-  const reserve=c=>sum(pool.filter(p=>p.id!==c.id).map(p=>p.value).sort((a,b)=>a-b).slice(0,empties));
-  const why=p=>p.hurt?"Lesionado":(GK_ONLY.includes(p.id)&&pos!=="POR")?"Solo portero":used.has(p.id)?"Ya en tu 7":p.value>base+1e-9?"No cabe":p.value+reserve(p)>base+1e-9?"Dejaría sin presupuesto al resto":"";
-  const list=[...P].sort((a,b)=>b.value-a.value);
-  return `<div class="grab"></div><div class="sec"><h2>Elige tu ${POS[pos].toLowerCase()}</h2><span class="sub">Te quedan ${money(Math.max(0,base))}${empties?" para "+(empties+1)+" huecos":""} · <button data-act="close" style="color:var(--accent);font-weight:700">Cerrar</button></span></div>
+  const role=slotRole(i), used=new Set(S.slots.filter((x,j)=>x&&j!==i)), base=BUDGET-(spent()-(S.slots[i]?byId(S.slots[i]).value:0));
+  const rest=S.slots.map((x,j)=>j).filter(j=>j!==i&&!S.slots[j]);
+  const why=p=>used.has(p.id)?"Ya en tu 7":p.value>base+1e-9?"No cabe":!canFill(rest,new Set([...used,p.id]),base-p.value)?"No dejaría opciones para completar el 7":"";
+  const list=P.filter(p=>eligible(p,role)).sort((a,b)=>b.value-a.value);
+  const improv=role==="POR"&&!P.some(x=>x.pos.includes("POR")&&!x.hurt);
+  return `<div class="grab"></div><div class="sec"><h2>Elige tu ${ROLE_NAME[role]}</h2><span class="sub">Te quedan ${money(Math.max(0,base))}${rest.length?" para "+(rest.length+1)+" huecos":""} · <button data-act="close" style="color:var(--accent);font-weight:700">Cerrar</button></span></div>
+   ${improv?'<p class="sub" style="padding:0 16px 8px;margin:0">Arturo está lesionado: puede jugar de portero cualquier jugador de campo.</p>':""}
    <div class="list">${list.map(p=>{const no=why(p);return `<button class="row" data-pick="${p.id}" ${no?"disabled":""}>
-     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub" style="white-space:nowrap">${no?no:"#"+p.num+" · "+p.pj+" PJ · media "+p.avg.toFixed(1)+" pts"}</span></div>
-     ${spark(p.hist)}<div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`}).join("")}
+     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub" style="white-space:nowrap">${no?no:posPills(p)+" "+p.pj+" PJ · "+p.avg.toFixed(1)+" pts"}</span></div>
+     ${spark(p.hist)}<div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`}).join("")||'<p class="sub" style="padding:16px">Ningún jugador disponible puede jugar ahí.</p>'}
    ${S.slots[i]?'<button class="row" data-pick="0"><div class="grow"><b class="neg">Quitar jugador</b></div></button>':""}</div>`;
 }
 

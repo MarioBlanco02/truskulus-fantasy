@@ -22,7 +22,7 @@ Reglas del juego: puntos desde la J4, presupuesto = coste medio de 7 jugadores +
 
 ## Posiciones y lesionados
 
-- **Posiciones:** cualquiera puede jugar en cualquier hueco de tu 7, salvo Arturo, que solo es portero. La posición cuenta según el hueco donde pongas al jugador: gol de defensa +2 extra, gol de portero +4 extra, portería a cero +3 si va de portero o defensa.
+- **Posiciones:** cada jugador tiene 1 o 2 posiciones (`POSICIONES` en `template.html`). El lateral juega de defensa o de interior por la banda, y el extremo de delantero o de interior. La posición cuenta según el hueco: gol de defensa +2 extra, de portero +4 extra, y portería a cero (2 goles o menos encajados) +3 si va de portero o defensa. Con el portero lesionado, de portero puede ir cualquier jugador de campo.
 - **Lesionados:** cualquier compañero marca a un jugador como lesionado desde su ficha. Si no se presenta, no resta puntos ni valor de mercado, y no se puede elegir. Requiere ejecutar `supabase/003_lesiones.sql` una vez.
 
 ## Puesta en marcha (una sola vez)
