@@ -244,7 +244,7 @@ const FORMS = {
 const ROLE_OK = {POR:["POR"], DEF:["DEF","LAT"], MEDC:["MED"], MEDB:["MED","LAT"], DEL:["DEL"]};
 const ROLE_NAME = {POR:"portero", DEF:"defensa", MEDC:"centrocampista", MEDB:"interior por la banda", DEL:"delantero"};
 const base0=r=>r==="MEDC"||r==="MEDB"?"MED":r;
-const INJ_DEFAULT = [{player_id:9003,since:2,until:null}];   // Arturo, lesionado; en modo equipo se guarda en Supabase
+const INJ_DEFAULT = [{player_id:9003,since:2,until:null},{player_id:9005,since:3,until:3}];   // Arturo, lesionado; en modo equipo se guarda en Supabase
 
 /* ── Utilidades ── */
 const sum = a=>a.reduce((x,y)=>x+y,0);
