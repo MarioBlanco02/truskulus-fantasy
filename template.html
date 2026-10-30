@@ -69,7 +69,7 @@ h3{font-size:16px;font-weight:700}
   background:var(--glass-strong);border:1px solid var(--edge-dim);flex:none;overflow:hidden;position:relative}
 .av img{width:100%;height:100%;object-fit:cover;display:block}
 .posdot{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:99px;color:#fff}
-.p-POR{background:#e0912b}.p-DEF{background:#3b82f6}.p-LAT{background:#0e9bb5}.p-MED{background:#16a765}.p-INT{background:#2bb673}.p-EXT{background:#9b5de5}.p-DEL{background:#e5484d}
+.p-POR{background:#e0912b}.p-DEF,.p-LAT{background:#3b82f6}.p-MED{background:#16a765}.p-DEL{background:#e5484d}
 
 /* hero partido */
 .hero{padding:20px 18px 16px;display:grid;gap:16px;position:relative;overflow:hidden}
@@ -226,14 +226,14 @@ const MVP_BONUS = [3,2,1];          // 1.º, 2.º y 3.º más votados del partid
 const MAX_ENCAJADOS = 2;           // "portería a cero" cuenta si encajamos 2 goles o menos
 const POINTS = {juega:2, gol:4, golDEF:2, golPOR:4, asist:3, porteria:3, mvp:3, amarilla:-1, roja:-3, ausente:-3};
 const RULES = [["Juega el partido","+2"],["Gol","+4"],["Gol jugando de defensa / portero","+2 / +4 extra"],["Asistencia","+3"],["Portería a cero: 2 goles o menos (de POR o DEF)","+3"],["MVP (el más votado)","+3"],["2.º más votado","+2"],["3.º más votado","+1"],["Tarjeta amarilla","-1"],["Tarjeta roja","-3"],["Está en tu 7 y no se presenta","-3"],["Capitán","puntos x2"]];
-const POS = {POR:"Portero",DEF:"Defensa central",LAT:"Lateral",MED:"Centrocampista",INT:"Interior de banda",EXT:"Extremo",DEL:"Delantero"};
-const POS_CORTO = {POR:"POR",DEF:"CEN",LAT:"LAT",MED:"MED",INT:"INT",EXT:"EXT",DEL:"DEL"};
+const POS = {POR:"Portero",DEF:"Defensa central",LAT:"Lateral",MED:"Centrocampista",DEL:"Delantero"};
+const POS_CORTO = {POR:"POR",DEF:"CEN",LAT:"LAT",MED:"MED",DEL:"DEL"};
 // Cada jugador tiene 1 o 2 posiciones (clave: nombre y apellido sin tildes). Se cambian aquí y se publica.
 const POSICIONES = {
   "arturo torres":["POR"], "mario blanco":["MED","LAT"], "adrian carmena":["DEF","DEL"], "adrian exposito":["MED"],
-  "mario jimeno":["LAT"], "ruben san felipe":["DEF"], "guillermo duran":["MED","LAT"], "mario secilla":["MED","LAT"],
-  "adrian sanchez":["DEF","LAT"], "jorge perez":["DEF","MED"], "jorge rodriguez":["LAT","EXT"], "jaime montero":["MED","DEL"],
-  "guillermo garrido":["MED","DEL"], "alejandro sanchez":["DEF","INT"], "mario camacho":["DEL","DEF"]
+  "mario jimeno":["LAT","MED"], "ruben san felipe":["DEF"], "guillermo duran":["MED","LAT"], "mario secilla":["MED","LAT"],
+  "adrian sanchez":["DEF","LAT"], "jorge perez":["DEF","MED"], "jorge rodriguez":["LAT","DEL"], "jaime montero":["MED","DEL"],
+  "guillermo garrido":["MED","DEL"], "alejandro sanchez":["DEF","MED"], "mario camacho":["DEL","DEF"]
 };
 // Huecos de cada formación. MEDB = interior por la banda (admite lateral y extremo); MEDC = centrocampista de centro.
 const FORMS = {
@@ -241,7 +241,7 @@ const FORMS = {
   "2-2-2":["POR","DEF","DEF","MEDB","MEDB","DEL","DEL"], "3-1-2":["POR","DEF","DEF","DEF","MEDC","DEL","DEL"],
   "1-3-2":["POR","DEF","MEDB","MEDC","MEDB","DEL","DEL"]
 };
-const ROLE_OK = {POR:["POR"], DEF:["DEF","LAT"], MEDC:["MED"], MEDB:["MED","INT","LAT","EXT"], DEL:["DEL","EXT"]};
+const ROLE_OK = {POR:["POR"], DEF:["DEF","LAT"], MEDC:["MED"], MEDB:["MED","LAT"], DEL:["DEL"]};
 const ROLE_NAME = {POR:"portero", DEF:"defensa", MEDC:"centrocampista", MEDB:"interior por la banda", DEL:"delantero"};
 const base0=r=>r==="MEDC"||r==="MEDB"?"MED":r;
 const INJ_DEFAULT = [{player_id:9003,since:2,until:null}];   // Arturo, lesionado; en modo equipo se guarda en Supabase
@@ -493,7 +493,7 @@ function viewLineup(){
       <div style="display:flex;gap:8px">${S.locked?`<button class="btn ghost" data-act="unlock" ${closed()?"disabled":""}>Editar</button>`:`<button class="btn ghost" data-act="clear" ${filled()?"":"disabled"}>Vaciar</button><button class="btn" data-act="lock" ${valid()&&!closed()?"":"disabled"}>Confirmar 7</button>`}</div>
     </div>
   </section>
-  <p class="note">Cada jugador tiene sus posiciones: el lateral juega de defensa o de interior por la banda, y el extremo de delantero o de interior. La posición cuenta según el hueco: gol de defensa +2 extra, de portero +4, y portería a cero (2 goles o menos) +3 para portero y defensas. Puedes editar hasta el inicio del partido.</p>`;
+  <p class="note">Cada jugador tiene sus posiciones: el lateral juega de defensa o de interior por la banda. La posición cuenta según el hueco: gol de defensa +2 extra, de portero +4, y portería a cero (2 goles o menos) +3 para portero y defensas. Puedes editar hasta el inicio del partido.</p>`;
 }
 function viewMarket(){
   let r=P.filter(p=>mfilter==="ALL"||(mfilter==="HURT"?p.hurt:!p.hurt));
