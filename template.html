@@ -454,7 +454,7 @@ function viewHome(){
   const lj=PLAYED.length?PLAYED[PLAYED.length-1].jornada:null;
   const pending=CLOUD&&lj&&voteOpen(lj)&&!myVote(lj)&&ME&&playedIds(matchOf(lj)).some(p=>p.id===ME.player_id);
   const lastJ=PLAYED.length?PLAYED[PLAYED.length-1].jornada:null;
-  return (lastJ?cardsSection(lastJ,"Los mejores de la jornada"):"")+(pending?`<button class="glass card" style="text-align:left" data-gotovote="${lj}"><div class="eyebrow">Votación abierta</div><b class="num" style="font-size:18px">Vota a los 3 mejores de la J${lj}</b><span class="sub">Cierra el ${fmtClose(lj)}</span></button>`:"")+`<section class="glass hero">
+  return (lastJ?cardsSection(lastJ):"")+(pending?`<button class="glass card" style="text-align:left" data-gotovote="${lj}"><div class="eyebrow">Votación abierta</div><b class="num" style="font-size:18px">Vota a los 3 mejores de la J${lj}</b><span class="sub">Cierra el ${fmtClose(lj)}</span></button>`:"")+`<section class="glass hero">
     <div class="eyebrow" style="text-align:center">Jornada ${NEXT.jornada} · ${S.locked?"Tu 7 está confirmado":"Próximo partido"}</div>
     <div class="vs"><div class="t">${crest(L[0],L[1],58)}<b>${L[1]}</b></div>
       <div class="mid"><span class="num" style="color:var(--muted)">VS</span></div>
@@ -549,7 +549,7 @@ function matchLog(m){
   return `<section class="glass card"><div class="eyebrow">Jornada ${m.jornada} · ${dfmt(m.fecha,{day:"numeric",month:"long"})}</div>
     <div class="hero" style="padding:0"><div class="vs"><div class="t">${crest(m.localId,m.local,46)}<b>${m.local}</b></div><div class="mid"><span class="num score">${m.golesLocal}–${m.golesVisitante}</span></div><div class="t">${crest(m.visitanteId,m.visitante,46)}<b>${m.visitante}</b></div></div></div>
     <span class="pill" style="justify-self:center">${counts?"Cuenta para el fantasy":"Pretemporada: calibra el mercado, no suma puntos"}</span></section>
-  ${cardsSection(m.jornada,"Cartas IF")}
+  ${cardsSection(m.jornada)}
   ${votePanel(m)}
   ${eventsPanel(m)}
   <section class="glass"><div class="sec"><h2>Rendimiento</h2><span class="eyebrow">Jornada ${m.jornada}</span></div>
@@ -569,7 +569,7 @@ function viewRank(){
   const cloudBoard=CLOUD?viewManagers():null;
   const rich=[...P].sort((a,b)=>b.value-a.value).slice(0,5);
   const pre=[...P].sort((a,b)=>b.pre-a.pre).slice(0,5);
-  return seg+(cloudBoard||`<section class="glass empty"><div class="eyebrow">Clasificación del fantasy</div><h2>Todos a cero</h2>
+  return seg+cardsSection("T")+(cloudBoard||`<section class="glass empty"><div class="eyebrow">Clasificación del fantasy</div><h2>Todos a cero</h2>
     <p class="sub" style="margin:0;max-width:30ch">Los puntos empiezan a contar en la Jornada ${START_JORNADA}. Confirma tu 7 antes del partido para entrar en la tabla.</p></section>`)+`
   <section class="glass"><div class="sec"><h2>Los más caros</h2><span class="eyebrow">Valor de mercado</span></div>
    <div class="list">${rich.map((p,i)=>`<button class="row" data-player="${p.id}"><span class="rank ${i<3?"top3":""}">${i+1}</span><div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub">#${p.num}</span></div><div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
@@ -624,16 +624,38 @@ function pickSheet(i){
    ${S.slots[i]?'<button class="row" data-pick="0"><div class="grow"><b class="neg">Quitar jugador</b></div></button>':""}</div>`;
 }
 
-/* ── Cartas IF: los mejores de cada jornada, generadas solas con las actas ── */
+/* ── Cartas: los mejores de cada jornada y el equipo de la temporada, generadas solas con las actas ── */
 const CARD_MIN = 6;                // puntos mínimos de la jornada para merecer carta
 const CARDS = new Map();
+// Ediciones: se eligen solas según la fecha del partido. Todas son diseños propios.
+const EDITIONS = {
+  if:       {label:"IF",        titulo:"Los mejores de la jornada", frame:["#fff1b0","#e0b04a","#a67a22","#f3d680"], dark:["#1f1a0f","#100d07","#070503"], text:"#f1d27a", glow:"241,210,122", decor:"spark"},
+  halloween:{label:"HALLOWEEN", titulo:"Cartas de Halloween",       frame:["#ffe0b8","#ff8a1f","#a8430a","#ffb35c"], dark:["#1c1028","#0e0718","#050309"], text:"#ffb35c", glow:"255,138,31", decor:"spark"},
+  navidad:  {label:"NAVIDAD",   titulo:"Cartas de Navidad",         frame:["#ffffff","#e43d4c","#8e1626","#ffd6da"], dark:["#2b0c11","#170609","#080203"], text:"#ffd9dc", glow:"228,61,76", decor:"snow"},
+  tots:     {label:"EQUIPO DE LA TEMPORADA", titulo:"Equipo de la temporada", frame:["#eaf4ff","#6ea8ff","#2b5bb3","#c7ddff"], dark:["#0b1832","#060d1e","#02050c"], text:"#b9d4ff", glow:"110,168,255", decor:"spark"}
+};
+function editionFor(j){
+  if(j==="T") return EDITIONS.tots;
+  const md=matchOf(j).fecha.slice(5,10);
+  if(md>="10-24"&&md<="11-01") return EDITIONS.halloween;
+  if(md>="12-01"||md<="01-06") return EDITIONS.navidad;
+  return EDITIONS.if;
+}
 function bestOfRound(j){
   const tally=voteTally(j), votes=votesClosed(j)&&tally.length?new Map(tally.map(t=>[t.p.id,t.pts])):new Map();
   return P.map(p=>({p,x:p.log.find(l=>l.m.jornada===j),vp:votes.get(p.id)||0}))
     .filter(r=>r.x&&!r.x.lesion&&!r.x.ausente&&r.x.pts>=CARD_MIN)
     .sort((a,b)=>b.vp-a.vp||b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||b.p.value-a.p.value).slice(0,3);
 }
-const ovrOf=x=>Math.max(70,Math.min(99,Math.round(68+x.pts*2.2)));
+const seasonDone=()=>PLAYED.length>=DATA.partidos.filter(m=>!m.descansa).length;
+function bestOfSeason(force){                    // los 7 con más puntos del fantasy al acabar la temporada
+  if(!force&&!seasonDone()) return [];
+  const n=PLAYED.filter(m=>m.jornada>=START_JORNADA).length||1;
+  return P.map(p=>{const l=p.log.filter(x=>x.m.jornada>=START_JORNADA);
+      return {p,vp:0,season:true,avg:p.fant/n,x:{pts:p.fant,goles:sum(l.map(x=>x.goles||0)),asist:sum(l.map(x=>x.asist||0))}}})
+    .filter(r=>r.x.pts>0).sort((a,b)=>b.x.pts-a.x.pts||b.x.goles-a.x.goles).slice(0,7);
+}
+const ovrOf=r=>r.season?Math.max(70,Math.min(99,Math.round(68+r.avg*2.8))):Math.max(70,Math.min(99,Math.round(68+r.x.pts*2.2)));
 const mvpCount=p=>p.log.filter(l=>l.ev.includes("MVP")).length;
 const loadImg=src=>new Promise(res=>{if(!src)return res(null);const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=src});
 function shield(g,W,H,k){
@@ -642,54 +664,67 @@ function shield(g,W,H,k){
   g.lineTo(W-k,H-170-k);g.quadraticCurveTo(W-k,H-110-k,W-k-70,H-70-k*.6);g.lineTo(W/2,H-k);
   g.lineTo(k+70,H-70-k*.6);g.quadraticCurveTo(k,H-110-k,k,H-170-k);g.lineTo(k,k+r);g.quadraticCurveTo(k,k,k+r,k);g.closePath();
 }
+function decorate(g,ed,seed){                   // adorno de la edición (determinista por jugador)
+  let a=seed*9301+49297; const rnd=()=>{a=(a*9301+49297)%233280;return a/233280};
+  for(let i=0;i<46;i++){
+    const x=rnd()*600,y=rnd()*880,r=ed.decor==="snow"?2+rnd()*5:1.5+rnd()*3.5;
+    g.globalAlpha=.18+rnd()*.5;g.fillStyle=ed.decor==="snow"?"#fff":ed.text;
+    if(ed.decor==="snow"){g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill()}
+    else{g.beginPath();g.moveTo(x,y-r*2.2);g.lineTo(x+r*.6,y-r*.6);g.lineTo(x+r*2.2,y);g.lineTo(x+r*.6,y+r*.6);g.lineTo(x,y+r*2.2);g.lineTo(x-r*.6,y+r*.6);g.lineTo(x-r*2.2,y);g.lineTo(x-r*.6,y-r*.6);g.closePath();g.fill()}
+  }
+  g.globalAlpha=1;
+}
 async function cardImage(r,j){
-  const {p,x,vp}=r, photo=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]), key=[j,p.id,x.pts,vp,photo?photo.length:0,p.value].join("|");
+  const {p,x,vp}=r, ed=editionFor(j), photo=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]), ovr=ovrOf(r),
+    key=[j,p.id,x.pts,vp,photo?photo.length:0,p.value,ed.label].join("|");
   if(CARDS.has(key)) return CARDS.get(key);
   try{await Promise.all([document.fonts.load('800 60px "Bricolage Grotesque"'),document.fonts.load('600 30px "Bricolage Grotesque"')])}catch(e){}
   const [ph,cr]=await Promise.all([loadImg(photo),loadImg(DATA.escudos&&DATA.escudos[TEAM_ID])]);
   const W=600,H=880,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
-  const F='"Bricolage Grotesque",-apple-system,"Helvetica Neue",Arial,sans-serif', GOLD="#f1d27a";
-  const gold=g.createLinearGradient(0,0,W,H);[[0,"#fff1b0"],[.35,"#e0b04a"],[.62,"#a67a22"],[1,"#f3d680"]].forEach(([o,col])=>gold.addColorStop(o,col));
-  shield(g,W,H,0);g.fillStyle=gold;g.fill();                         // marco dorado
-  shield(g,W,H,12);const dark=g.createLinearGradient(0,0,0,H);dark.addColorStop(0,"#1f1a0f");dark.addColorStop(.55,"#100d07");dark.addColorStop(1,"#070503");g.fillStyle=dark;g.fill();
+  const F='"Bricolage Grotesque",-apple-system,"Helvetica Neue",Arial,sans-serif', TX=ed.text;
+  const gold=g.createLinearGradient(0,0,W,H);ed.frame.forEach((col,i)=>gold.addColorStop([0,.35,.62,1][i],col));
+  shield(g,W,H,0);g.fillStyle=gold;g.fill();                                        // marco
+  shield(g,W,H,12);const dark=g.createLinearGradient(0,0,0,H);dark.addColorStop(0,ed.dark[0]);dark.addColorStop(.55,ed.dark[1]);dark.addColorStop(1,ed.dark[2]);g.fillStyle=dark;g.fill();
   g.save();shield(g,W,H,12);g.clip();
-  const glow=g.createRadialGradient(410,215,20,410,215,320);glow.addColorStop(0,"rgba(241,210,122,.38)");glow.addColorStop(1,"rgba(241,210,122,0)");g.fillStyle=glow;g.fillRect(0,0,W,H);
+  const glow=g.createRadialGradient(410,215,20,410,215,320);glow.addColorStop(0,`rgba(${ed.glow},.38)`);glow.addColorStop(1,`rgba(${ed.glow},0)`);g.fillStyle=glow;g.fillRect(0,0,W,H);
+  decorate(g,ed,p.id%997+7);
   const sheen=g.createLinearGradient(0,0,W,H*.7);sheen.addColorStop(0,"rgba(255,255,255,.10)");sheen.addColorStop(.5,"rgba(255,255,255,0)");sheen.addColorStop(1,"rgba(255,255,255,.05)");g.fillStyle=sheen;g.fillRect(0,0,W,H);
   g.restore();
   g.fillStyle=gold;g.textBaseline="alphabetic";
-  g.font='800 108px '+F;g.fillText(String(ovrOf(x)),62,170);                      // valoración
+  g.font='800 108px '+F;g.fillText(String(ovr),62,170);
   g.font='700 38px '+F;g.fillText(POS_CORTO[p.pos[0]],70,222);
   g.fillRect(64,240,90,4);
   if(cr){g.drawImage(cr,70,262,74,74)}
-  g.font='800 30px '+F;g.fillStyle="#fff";g.fillText("J"+j,76,376);
-  g.save();g.beginPath();g.arc(410,215,128,0,Math.PI*2);g.clip();                  // foto
+  g.font='800 30px '+F;g.fillStyle="#fff";g.fillText(j==="T"?"TEMP.":"J"+j,76,376);
+  g.save();g.beginPath();g.arc(410,215,128,0,Math.PI*2);g.clip();                    // foto
   g.fillStyle="#2a2417";g.fillRect(270,75,280,280);
   if(ph){const s=Math.max(256/ph.width,256/ph.height);g.drawImage(ph,410-ph.width*s/2,215-ph.height*s/2,ph.width*s,ph.height*s)}
-  else{g.fillStyle=GOLD;g.font='800 110px '+F;g.textAlign="center";g.fillText(String(p.num),410,255);g.textAlign="left"}
+  else{g.fillStyle=TX;g.font='800 110px '+F;g.textAlign="center";g.fillText(String(p.num),410,255);g.textAlign="left"}
   g.restore();g.lineWidth=7;g.strokeStyle=gold;g.beginPath();g.arc(410,215,128,0,Math.PI*2);g.stroke();
-  g.fillStyle=GOLD;g.textAlign="center";g.shadowColor="rgba(0,0,0,.6)";g.shadowBlur=8;                // nombre
+  g.fillStyle=TX;g.textAlign="center";g.shadowColor="rgba(0,0,0,.6)";g.shadowBlur=8;            // nombre
   let fs=66;g.font='800 '+fs+'px '+F;const nm=p.n.toUpperCase();while(g.measureText(nm).width>500&&fs>30){fs-=2;g.font='800 '+fs+'px '+F}
   g.fillText(nm,W/2,470);g.shadowBlur=0;
   g.fillStyle=gold;g.fillRect(120,494,360,4);
   const st=[[x.pts,"PTS"],[x.goles,"GOL"],[x.asist,"ASI"],[p.pj,"PJ"],[mvpCount(p),"MVP"],[p.value.toFixed(1).replace(".",","),"VAL"]];
   st.forEach(([v,l],i)=>{const cx=130+(i%3)*170, cy=(i<3?580:705);
-    g.fillStyle="#fff";g.font='800 58px '+F;g.fillText(String(v),cx,cy);g.fillStyle=GOLD;g.font='700 28px '+F;g.fillText(l,cx,cy+36)});
-  g.fillStyle=GOLD;g.font='700 24px '+F;g.globalAlpha=.85;g.fillText(TEAM.toUpperCase()+" · IF",W/2,800);g.globalAlpha=1;g.textAlign="left";
+    g.fillStyle="#fff";g.font='800 58px '+F;g.fillText(String(v),cx,cy);g.fillStyle=TX;g.font='700 28px '+F;g.fillText(l,cx,cy+36)});
+  g.fillStyle=TX;g.font='700 '+(ed.label.length>12?20:24)+'px '+F;g.globalAlpha=.85;g.fillText(TEAM.toUpperCase()+" · "+ed.label,W/2,800);g.globalAlpha=1;g.textAlign="left";
   const url=c.toDataURL("image/png"); CARDS.set(key,{url,canvas:c}); return CARDS.get(key);
 }
+const entriesFor=j=>j==="T"?bestOfSeason():bestOfRound(j);
 function cardsSection(j,title){
-  const best=bestOfRound(j); if(!best.length) return "";
-  return `<section class="glass"><div class="sec"><h2>${title}</h2><span class="eyebrow">Jornada ${j}</span></div>
+  const best=entriesFor(j); if(!best.length) return "";
+  return `<section class="glass"><div class="sec"><h2>${title||editionFor(j).titulo}</h2><span class="eyebrow">${j==="T"?"Temporada":"Jornada "+j}</span></div>
     <div class="cards">${best.map(r=>`<button class="cardbtn" data-card="${j}:${r.p.id}" aria-label="Carta de ${r.p.n}"><span class="ph"></span></button>`).join("")}</div></section>`;
 }
 async function hydrateCards(){
   for(const el of document.querySelectorAll("[data-card]")){
-    const [j,pid]=el.dataset.card.split(":").map(Number), r=bestOfRound(j).find(x=>x.p.id===pid); if(!r) continue;
+    const [js,pid]=el.dataset.card.split(":"), j=js==="T"?"T":+js, r=entriesFor(j).find(x=>x.p.id===+pid); if(!r) continue;
     cardImage(r,j).then(c=>{if(el.isConnected)el.innerHTML=`<img src="${c.url}" alt="Carta de ${r.p.n}">`});
   }
 }
 async function openCard(key){
-  const [j,pid]=key.split(":").map(Number), r=bestOfRound(j).find(x=>x.p.id===pid); if(!r) return;
+  const [js,pid]=key.split(":"), j=js==="T"?"T":+js, r=entriesFor(j).find(x=>x.p.id===+pid); if(!r) return;
   const c=await cardImage(r,j);
   sheet(`<div class="grab"></div><div class="profile"><img class="bigcard" src="${c.url}" alt="Carta de ${r.p.n}">
     <div class="sub">Mantén pulsada la carta para guardarla, o compártela con el botón.</div>
@@ -697,11 +732,11 @@ async function openCard(key){
     <button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`);
 }
 async function shareCard(key){
-  const [j,pid]=key.split(":").map(Number), r=bestOfRound(j).find(x=>x.p.id===pid); if(!r) return;
-  const {canvas}=await cardImage(r,j), name="carta-"+norm(r.p.n).replace(/\W+/g,"-")+"-J"+j+".png";
+  const [js,pid]=key.split(":"), j=js==="T"?"T":+js, r=entriesFor(j).find(x=>x.p.id===+pid); if(!r) return;
+  const {canvas}=await cardImage(r,j), name="carta-"+norm(r.p.n).replace(/\W+/g,"-")+"-"+(j==="T"?"temporada":"J"+j)+".png";
   canvas.toBlob(async b=>{
     const f=new File([b],name,{type:"image/png"});
-    if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:"Carta IF · "+r.p.n})}catch(e){}return}
+    if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:"Carta · "+r.p.n})}catch(e){}return}
     try{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click();toast("Carta guardada")}catch(e){toast("Mantén pulsada la carta para guardarla")}
   },"image/png");
 }

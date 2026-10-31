@@ -20,9 +20,11 @@ Reglas del juego: puntos desde la J4, presupuesto = coste medio de 7 jugadores +
 - **Votación MVP** (Ranking → Jornadas): quien jugó vota a los 3 mejores (3, 2 y 1 puntos). El más votado suma +3, el 2.º +2 y el 3.º +1. Los votos son secretos hasta que cierra la votación, 3 días después del inicio del partido.
 - Requiere ejecutar `supabase/002_eventos_y_votos.sql` una vez en el editor SQL.
 
-## Cartas IF
+## Cartas
 
-Cada jornada, los 3 mejores (o los 2 o 1 que superen 6 puntos) reciben una carta dorada con su foto, valoración y estadísticas. Se calculan en la propia app con las actas y los votos, así que aparecen solas tras la actualización del martes. Se ven en Inicio y en Ranking → Jornadas, y se pueden compartir como imagen. El diseño está en `cardImage()` de `template.html`.
+Cada jornada, los 3 mejores (o los 2 o 1 que superen 6 puntos) reciben una carta con su foto, valoración y estadísticas. Se calculan en la propia app con las actas y los votos, así que aparecen solas tras la actualización del martes. Se ven en Inicio y en Ranking → Jornadas, y se pueden compartir como imagen.
+
+La edición cambia sola según la fecha del partido: **IF** (dorada), **Halloween** (24 oct – 1 nov) y **Navidad** (1 dic – 6 ene). Al terminar la temporada aparece el **Equipo de la temporada**: los 7 con más puntos del fantasy, con una carta azul especial. Los diseños son propios, no usan material oficial de ningún juego. Se editan en `EDITIONS` y `cardImage()` de `template.html`.
 
 ## Posiciones y lesionados
 
