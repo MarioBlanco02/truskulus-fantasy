@@ -569,7 +569,7 @@ function viewRank(){
   const seg=`<div class="glass seg" role="group" aria-label="Vista"><button data-rv="fant" aria-pressed="${rankView==="fant"}">Fantasy</button><button data-rv="jor" aria-pressed="${rankView==="jor"}">Jornadas</button><button data-rv="reg" aria-pressed="${rankView==="reg"}">Baremo</button></div>`;
   if(rankView==="reg") return seg+`<section class="glass"><div class="sec"><h2>Baremo</h2><span class="eyebrow">Desde la J${START_JORNADA}</span></div><div class="rules">${RULES.map(([k,v])=>`<span>${k}</span><span>${v}</span>`).join("")}</div></section>
     <section class="glass card"><h3>Votación del MVP</h3><p class="sub" style="margin:0">Después de cada partido, quienes jugaron votan a los 3 mejores: 3, 2 y 1 puntos. No vale votarse. La votación cierra a los ${VOTE_DAYS} días del inicio del partido. El más votado es el MVP y suma +${MVP_BONUS[0]}, el segundo +${MVP_BONUS[1]} y el tercero +${MVP_BONUS[2]}. Si hay empate, todos los empatados suman lo mismo.</p></section>
-    <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€. Quien consigue carta en una jornada recibe una prima extra: +0,5, +0,3 y +0,2 M€ para el 1.º, 2.º y 3.º."}</p></section>`;
+    <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€. Quien consigue carta en una jornada recibe una prima extra: +0,5 M€ el 1.º y +0,3 M€ el 2.º."}</p></section>`;
   if(rankView==="jor"){
     const segj=`<div class="glass seg" role="group" aria-label="Jornada">${PLAYED.map(x=>`<button data-j="${x.jornada}" aria-pressed="${x.jornada===jsel}">J${x.jornada}</button>`).join("")}</div>`;
     const m=PLAYED.find(x=>x.jornada===jsel); return seg+segj+(m?matchLog(m):"");
@@ -609,7 +609,8 @@ function profile(id){
   return `<div class="grab"></div><div class="profile">
     ${canEdit(p)?`<label class="avbtn"><div class="av bigav">${faceOf(p,p.num)}</div><span class="cam">Cambiar foto</span><input type="file" accept="image/*" data-photo="${p.id}" aria-label="Foto de ${p.n}"></label>`:`<div class="av bigav">${faceOf(p,p.num)}</div>`}
     <div><h2>${p.full}</h2><div class="sub">${p.n} · #${p.num}${p.hot?" · en racha":""}</div></div>
-    ${p.cards.length?`<div class="chipsel" style="justify-content:center">${p.cards.map(c=>`<button data-card="${c.j}:${p.id}" style="background:${c.ed.frame[1]};color:#1a1200;border-color:transparent">${c.ed.label} · J${c.j} · ${c.place}.º</button>`).join("")}</div>`:""}
+    <div class="sub">Media ${ovrNow(p)} · ${p.cards.length?p.cards.length+(p.cards.length>1?" cartas conseguidas":" carta conseguida"):"todavía sin cartas"}</div>
+    ${p.cards.length?`<div class="cards" style="width:100%;padding:0 0 8px">${p.cards.map(c=>`<button class="cardbtn" data-card="${c.j}:${p.id}" aria-label="Carta ${c.ed.label} J${c.j}"><span class="ph"></span></button>`).join("")}</div>`:""}
     <div class="chipsel" style="justify-content:center">${p.pos.map(x=>`<span class="posdot p-${x}" style="font-size:12px;padding:4px 10px">${POS[x]}</span>`).join("")}</div>
     ${injuryBox(p)}
     <div class="stats"><div class="stat"><b>${money(p.value)}</b><span class="sub">Valor</span></div><div class="stat"><b>${p.pj}</b><span class="sub">Partidos</span></div><div class="stat"><b>${p.j.goles}</b><span class="sub">Goles</span></div><div class="stat"><b>${p.j.asistencias}</b><span class="sub">Asist.</span></div></div>
@@ -635,15 +636,16 @@ function pickSheet(i){
 }
 
 /* ── Cartas: los mejores de cada jornada y el equipo de la temporada, generadas solas con las actas ── */
-const CARD_BONUS = [0.5,0.3,0.2];  // prima de valor de mercado (M€) para el 1.º, 2.º y 3.º de cada jornada
+const CARD_BONUS = [0.5,0.3];      // prima de valor de mercado (M€) para el 1.º y el 2.º de cada jornada
+const OVR_BASE = 80;               // media inicial de todas las cartas; sube 1 punto por cada carta conseguida
 const CARD_MIN = 6;                // puntos mínimos de la jornada para merecer carta
 const CARDS = new Map();
 // Ediciones: se eligen solas según la fecha del partido. Todas son diseños propios.
 const EDITIONS = {
-  if:       {label:"IF",        titulo:"Los mejores de la jornada", frame:["#fff1b0","#e0b04a","#a67a22","#f3d680"], dark:["#1f1a0f","#100d07","#070503"], text:"#f1d27a", glow:"241,210,122", decor:"spark"},
-  halloween:{label:"HALLOWEEN", titulo:"Cartas de Halloween",       frame:["#ffe0b8","#ff8a1f","#a8430a","#ffb35c"], dark:["#1c1028","#0e0718","#050309"], text:"#ffb35c", glow:"255,138,31", decor:"spark"},
-  navidad:  {label:"NAVIDAD",   titulo:"Cartas de Navidad",         frame:["#ffffff","#e43d4c","#8e1626","#ffd6da"], dark:["#2b0c11","#170609","#080203"], text:"#ffd9dc", glow:"228,61,76", decor:"snow"},
-  tots:     {label:"EQUIPO DE LA TEMPORADA", titulo:"Equipo de la temporada", frame:["#eaf4ff","#6ea8ff","#2b5bb3","#c7ddff"], dark:["#0b1832","#060d1e","#02050c"], text:"#b9d4ff", glow:"110,168,255", decor:"spark"}
+  if:       {label:"IF",        titulo:"Los mejores de la jornada", frame:["#fff1b0","#e0b04a","#a67a22","#f3d680"], dark:["#1f1a0f","#100d07","#070503"], text:"#f1d27a", ink:"#2a1d00", glow:"241,210,122", decor:"spark"},
+  halloween:{label:"HALLOWEEN", titulo:"Cartas de Halloween",       frame:["#ffe0b8","#ff8a1f","#a8430a","#ffb35c"], dark:["#1c1028","#0e0718","#050309"], text:"#ffb35c", ink:"#2b1100", glow:"255,138,31", decor:"spark"},
+  navidad:  {label:"NAVIDAD",   titulo:"Cartas de Navidad",         frame:["#ffffff","#e43d4c","#8e1626","#ffd6da"], dark:["#2b0c11","#170609","#080203"], text:"#ffd9dc", ink:"#3a0710", glow:"228,61,76", decor:"snow"},
+  tots:     {label:"EQUIPO DE LA TEMPORADA", titulo:"Equipo de la temporada", frame:["#eaf4ff","#6ea8ff","#2b5bb3","#c7ddff"], dark:["#0b1832","#060d1e","#02050c"], text:"#b9d4ff", ink:"#07173a", glow:"110,168,255", decor:"spark"}
 };
 function editionFor(j){
   if(j==="T") return EDITIONS.tots;
@@ -656,7 +658,7 @@ function bestOfRound(j){
   const tally=voteTally(j), votes=votesClosed(j)&&tally.length?new Map(tally.map(t=>[t.p.id,t.pts])):new Map();
   return P.map(p=>({p,x:p.log.find(l=>l.m.jornada===j),vp:votes.get(p.id)||0}))
     .filter(r=>r.x&&!r.x.lesion&&!r.x.ausente&&r.x.pts>=CARD_MIN)
-    .sort((a,b)=>b.vp-a.vp||b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||sum(b.p.log.map(l=>l.pts))-sum(a.p.log.map(l=>l.pts))||a.p.id-b.p.id).slice(0,3);
+    .sort((a,b)=>b.vp-a.vp||b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||sum(b.p.log.map(l=>l.pts))-sum(a.p.log.map(l=>l.pts))||a.p.id-b.p.id).slice(0,2);
 }
 const seasonDone=()=>PLAYED.length>=DATA.partidos.filter(m=>!m.descansa).length;
 function bestOfSeason(force){                    // los 7 con más puntos del fantasy al acabar la temporada
@@ -666,7 +668,8 @@ function bestOfSeason(force){                    // los 7 con más puntos del fa
       return {p,vp:0,season:true,avg:p.fant/n,x:{pts:p.fant,goles:sum(l.map(x=>x.goles||0)),asist:sum(l.map(x=>x.asist||0))}}})
     .filter(r=>r.x.pts>0).sort((a,b)=>b.x.pts-a.x.pts||b.x.goles-a.x.goles).slice(0,7);
 }
-const ovrOf=r=>r.season?Math.max(70,Math.min(99,Math.round(68+r.avg*2.8))):Math.max(70,Math.min(99,Math.round(68+r.x.pts*2.2)));
+const ovrAt=(p,j)=>Math.min(99,OVR_BASE+(j==="T"?p.cards.length+2:p.cards.filter(c=>c.j<=j).length));   // la carta de una jornada ya incluye el punto que gana
+const ovrNow=p=>Math.min(99,OVR_BASE+p.cards.length);
 const mvpCount=p=>p.log.filter(l=>l.ev.includes("MVP")).length;
 const loadImg=src=>new Promise(res=>{if(!src)return res(null);const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=src});
 function shield(g,W,H,k){
@@ -686,40 +689,68 @@ function decorate(g,ed,seed){                   // adorno de la edición (determ
   g.globalAlpha=1;
 }
 async function cardImage(r,j){
-  const {p,x,vp}=r, ed=editionFor(j), photo=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]), ovr=ovrOf(r),
-    key=[j,p.id,x.pts,vp,photo?photo.length:0,p.value,ed.label].join("|");
+  const {p,x,vp}=r, ed=editionFor(j), photo=S.photos[p.id]||(DATA.fotos&&DATA.fotos[p.id]), ovr=ovrAt(p,j),
+    key=[j,p.id,x.pts,vp,photo?photo.length:0,p.value,ed.label,ovr,"v2"].join("|");
   if(CARDS.has(key)) return CARDS.get(key);
   try{await Promise.all([document.fonts.load('800 60px "Bricolage Grotesque"'),document.fonts.load('600 30px "Bricolage Grotesque"')])}catch(e){}
   const [ph,cr]=await Promise.all([loadImg(photo),loadImg(DATA.escudos&&DATA.escudos[TEAM_ID])]);
   const W=600,H=880,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
-  const F='"Bricolage Grotesque",-apple-system,"Helvetica Neue",Arial,sans-serif', TX=ed.text;
-  const gold=g.createLinearGradient(0,0,W,H);ed.frame.forEach((col,i)=>gold.addColorStop([0,.35,.62,1][i],col));
-  shield(g,W,H,0);g.fillStyle=gold;g.fill();                                        // marco
-  shield(g,W,H,12);const dark=g.createLinearGradient(0,0,0,H);dark.addColorStop(0,ed.dark[0]);dark.addColorStop(.55,ed.dark[1]);dark.addColorStop(1,ed.dark[2]);g.fillStyle=dark;g.fill();
-  g.save();shield(g,W,H,12);g.clip();
-  const glow=g.createRadialGradient(410,215,20,410,215,320);glow.addColorStop(0,`rgba(${ed.glow},.38)`);glow.addColorStop(1,`rgba(${ed.glow},0)`);g.fillStyle=glow;g.fillRect(0,0,W,H);
+  const F='"Bricolage Grotesque",-apple-system,"Helvetica Neue",Arial,sans-serif', TX=ed.text, INK=ed.ink;
+  const lin=(x0,y0,x1,y1,stops)=>{const q=g.createLinearGradient(x0,y0,x1,y1);stops.forEach(([o,col])=>q.addColorStop(o,col));return q};
+  const metal=lin(0,0,W,H,[[0,ed.frame[0]],[.18,ed.frame[1]],[.38,ed.frame[3]],[.55,ed.frame[2]],[.78,ed.frame[1]],[1,ed.frame[0]]]);
+  const spaced=(t,x0,y0,sp)=>{try{g.letterSpacing=sp+"px"}catch(e){}g.fillText(t,x0,y0);try{g.letterSpacing="0px"}catch(e){}};
+  // 1) marco metálico con bisel
+  shield(g,W,H,0);g.fillStyle=metal;g.fill();
+  shield(g,W,H,9);g.fillStyle="rgba(0,0,0,.55)";g.fill();
+  shield(g,W,H,12);g.fillStyle=lin(0,0,W,H,[[0,ed.frame[3]],[.5,ed.frame[2]],[1,ed.frame[1]]]);g.fill();
+  shield(g,W,H,17);g.fillStyle=lin(0,0,0,H,[[0,ed.dark[0]],[.5,ed.dark[1]],[1,ed.dark[2]]]);g.fill();
+  // 2) fondo: reflejos, trama y adorno de la edición
+  g.save();shield(g,W,H,17);g.clip();
+  const spot=g.createRadialGradient(405,225,10,405,225,360);spot.addColorStop(0,`rgba(${ed.glow},.55)`);spot.addColorStop(.5,`rgba(${ed.glow},.12)`);spot.addColorStop(1,`rgba(${ed.glow},0)`);g.fillStyle=spot;g.fillRect(0,0,W,H);
+  g.globalAlpha=.05;g.strokeStyle="#fff";g.lineWidth=1.2;for(let k=-H;k<W;k+=16){g.beginPath();g.moveTo(k,H);g.lineTo(k+H,0);g.stroke()}g.globalAlpha=1;
+  if(cr){g.globalAlpha=.07;g.drawImage(cr,110,360,380,380);g.globalAlpha=1}
   decorate(g,ed,p.id%997+7);
-  const sheen=g.createLinearGradient(0,0,W,H*.7);sheen.addColorStop(0,"rgba(255,255,255,.10)");sheen.addColorStop(.5,"rgba(255,255,255,0)");sheen.addColorStop(1,"rgba(255,255,255,.05)");g.fillStyle=sheen;g.fillRect(0,0,W,H);
+  const ray=lin(0,0,W,H*.8,[[0,"rgba(255,255,255,.16)"],[.35,"rgba(255,255,255,0)"],[.7,"rgba(255,255,255,.04)"],[1,"rgba(255,255,255,.09)"]]);g.fillStyle=ray;g.fillRect(0,0,W,H);
+  g.globalCompositeOperation="soft-light";g.fillStyle=lin(0,60,W,H-60,[[0,"rgba(255,80,120,.16)"],[.3,"rgba(255,220,80,.14)"],[.55,"rgba(80,255,190,.12)"],[.8,"rgba(80,160,255,.16)"],[1,"rgba(190,90,255,.14)"]]);g.fillRect(0,0,W,H);g.globalCompositeOperation="source-over";
+  const vig=g.createRadialGradient(W/2,H/2,H*.28,W/2,H/2,H*.75);vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,0,.5)");g.fillStyle=vig;g.fillRect(0,0,W,H);
   g.restore();
-  g.fillStyle=gold;g.textBaseline="alphabetic";
-  g.font='800 108px '+F;g.fillText(String(ovr),62,170);
-  g.font='700 38px '+F;g.fillText(POS_CORTO[p.pos[0]],70,222);
-  g.fillRect(64,240,90,4);
-  if(cr){g.drawImage(cr,70,262,74,74)}
-  g.font='800 30px '+F;g.fillStyle="#fff";g.fillText(j==="T"?"TEMP.":"J"+j,76,376);
-  g.save();g.beginPath();g.arc(410,215,128,0,Math.PI*2);g.clip();                    // foto
-  g.fillStyle="#2a2417";g.fillRect(270,75,280,280);
-  if(ph){const s=Math.max(256/ph.width,256/ph.height);g.drawImage(ph,410-ph.width*s/2,215-ph.height*s/2,ph.width*s,ph.height*s)}
-  else{g.fillStyle=TX;g.font='800 110px '+F;g.textAlign="center";g.fillText(String(p.num),410,255);g.textAlign="left"}
-  g.restore();g.lineWidth=7;g.strokeStyle=gold;g.beginPath();g.arc(410,215,128,0,Math.PI*2);g.stroke();
-  g.fillStyle=TX;g.textAlign="center";g.shadowColor="rgba(0,0,0,.6)";g.shadowBlur=8;            // nombre
-  let fs=66;g.font='800 '+fs+'px '+F;const nm=p.n.toUpperCase();while(g.measureText(nm).width>500&&fs>30){fs-=2;g.font='800 '+fs+'px '+F}
-  g.fillText(nm,W/2,470);g.shadowBlur=0;
-  g.fillStyle=gold;g.fillRect(120,494,360,4);
-  const st=[[x.pts,"PTS"],[x.goles,"GOL"],[x.asist,"ASI"],[p.pj,"PJ"],[mvpCount(p),"MVP"],[p.value.toFixed(1).replace(".",","),"VAL"]];
-  st.forEach(([v,l],i)=>{const cx=130+(i%3)*170, cy=(i<3?580:705);
-    g.fillStyle="#fff";g.font='800 58px '+F;g.fillText(String(v),cx,cy);g.fillStyle=TX;g.font='700 28px '+F;g.fillText(l,cx,cy+36)});
-  g.fillStyle=TX;g.font='700 '+(ed.label.length>12?20:24)+'px '+F;g.globalAlpha=.85;g.fillText(TEAM.toUpperCase()+" · "+ed.label,W/2,800);g.globalAlpha=1;g.textAlign="left";
+  g.save();shield(g,W,H,30);g.lineWidth=1.6;g.strokeStyle=`rgba(${ed.glow},.55)`;g.stroke();g.restore();            // filete interior
+  // 3) valoración, posición y escudo
+  g.textBaseline="alphabetic";g.textAlign="left";
+  g.font='800 116px '+F;g.fillStyle="rgba(0,0,0,.55)";g.fillText(String(ovr),63,175);g.fillStyle=lin(0,90,0,185,[[0,ed.frame[0]],[1,ed.frame[1]]]);g.fillText(String(ovr),60,171);
+  g.font='700 38px '+F;g.fillStyle=TX;spaced(POS_CORTO[p.pos[0]],64,222,3);
+  g.fillStyle=metal;g.fillRect(62,240,92,4);
+  if(cr){g.save();g.shadowColor="rgba(0,0,0,.6)";g.shadowBlur=12;g.drawImage(cr,66,262,80,80);g.restore()}
+  g.fillStyle="rgba(0,0,0,.45)";g.strokeStyle=TX;g.lineWidth=2;g.beginPath();g.roundRect(60,360,100,38,19);g.fill();g.stroke();
+  g.fillStyle="#fff";g.font='800 22px '+F;g.textAlign="center";spaced(j==="T"?"TEMP.":"J"+j,110,386,1);g.textAlign="left";
+  // 4) foto con doble aro
+  g.save();g.shadowColor="rgba(0,0,0,.6)";g.shadowBlur=26;g.shadowOffsetY=10;g.fillStyle="#1a150c";g.beginPath();g.arc(405,225,132,0,Math.PI*2);g.fill();g.restore();
+  g.save();g.beginPath();g.arc(405,225,132,0,Math.PI*2);g.clip();
+  g.fillStyle="#2a2417";g.fillRect(260,80,290,290);
+  if(ph){const s=Math.max(264/ph.width,264/ph.height);g.drawImage(ph,405-ph.width*s/2,225-ph.height*s/2,ph.width*s,ph.height*s)}
+  else{g.fillStyle=TX;g.font='800 120px '+F;g.textAlign="center";g.fillText(String(p.num),405,268);g.textAlign="left"}
+  const fade=g.createLinearGradient(0,270,0,357);fade.addColorStop(0,"rgba(0,0,0,0)");fade.addColorStop(1,"rgba(0,0,0,.35)");g.fillStyle=fade;g.fillRect(260,250,290,120);
+  g.restore();
+  g.lineWidth=9;g.strokeStyle=metal;g.beginPath();g.arc(405,225,136,0,Math.PI*2);g.stroke();
+  g.lineWidth=2;g.strokeStyle=`rgba(${ed.glow},.55)`;g.beginPath();g.arc(405,225,151,0,Math.PI*2);g.stroke();
+  // 5) placa del nombre
+  const px=62,py=420,pw=476,ph2=76,cut=20;
+  g.save();g.shadowColor="rgba(0,0,0,.5)";g.shadowBlur=14;g.shadowOffsetY=6;
+  g.beginPath();g.moveTo(px+cut,py);g.lineTo(px+pw-cut,py);g.lineTo(px+pw,py+cut);g.lineTo(px+pw,py+ph2-cut);g.lineTo(px+pw-cut,py+ph2);g.lineTo(px+cut,py+ph2);g.lineTo(px,py+ph2-cut);g.lineTo(px,py+cut);g.closePath();
+  g.fillStyle=lin(0,py,0,py+ph2,[[0,ed.frame[0]],[.45,ed.frame[1]],[1,ed.frame[2]]]);g.fill();g.restore();
+  g.fillStyle="rgba(255,255,255,.35)";g.fillRect(px+cut,py+3,pw-2*cut,2);
+  g.textAlign="center";let fs=58;g.font='800 '+fs+'px '+F;const nm=p.n.toUpperCase();while(g.measureText(nm).width>430&&fs>28){fs-=2;g.font='800 '+fs+'px '+F}
+  g.fillStyle="rgba(255,255,255,.4)";g.fillText(nm,W/2,py+ph2-17);g.fillStyle=INK;g.fillText(nm,W/2,py+ph2-18);
+  // 6) panel de estadísticas
+  g.fillStyle="rgba(0,0,0,.38)";g.strokeStyle=`rgba(${ed.glow},.4)`;g.lineWidth=1.5;g.beginPath();g.roundRect(62,520,476,248,18);g.fill();g.stroke();
+  g.strokeStyle=`rgba(${ed.glow},.28)`;g.beginPath();g.moveTo(221,540);g.lineTo(221,748);g.moveTo(379,540);g.lineTo(379,748);g.moveTo(80,644);g.lineTo(520,644);g.stroke();
+  const st=[[x.pts,"PUNTOS"],[x.goles,"GOLES"],[x.asist,"ASIST."],[p.pj,"PARTIDOS"],[mvpCount(p),"MVP"],[p.value.toFixed(1).replace(".",","),"VALOR"]];
+  st.forEach(([v,l],i)=>{const cx=142+(i%3)*158, cy=(i<3?594:718);
+    g.textAlign="center";g.fillStyle="#fff";g.font='800 56px '+F;g.fillText(String(v),cx,cy);g.fillStyle=TX;g.font='700 19px '+F;spaced(l,cx,cy+30,2)});
+  // 7) pie
+  g.textAlign="center";g.fillStyle=TX;g.globalAlpha=.9;
+  const foot=TEAM.toUpperCase()+" · "+ed.label;let ff=23;g.font='700 '+ff+'px '+F;while(g.measureText(foot).width>400&&ff>13){ff-=1;g.font='700 '+ff+'px '+F}
+  spaced(foot,W/2,806,1.5);g.globalAlpha=1;g.textAlign="left";
   const url=c.toDataURL("image/png"); CARDS.set(key,{url,canvas:c}); return CARDS.get(key);
 }
 const entriesFor=j=>j==="T"?bestOfSeason():bestOfRound(j);
@@ -760,7 +791,7 @@ function render(){
   if(!gate) hydrateCards();
   document.getElementById("tabs").innerHTML=TABS.map(([k,l,ic])=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab===k}">${ic}${l}</button>`).join("");
 }
-function sheet(html){document.getElementById("layer").innerHTML=html?`<div class="scrim" data-act="close"><div class="sheet glass" role="dialog">${html}</div></div>`:""}
+function sheet(html){document.getElementById("layer").innerHTML=html?`<div class="scrim" data-act="close"><div class="sheet glass" role="dialog">${html}</div></div>`:"";if(html)hydrateCards()}
 let pickIdx=null;
 function resizePhoto(file,cb){
   const img=new Image(), url=URL.createObjectURL(file);
