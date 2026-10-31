@@ -20,6 +20,10 @@ Reglas del juego: puntos desde la J4, presupuesto = coste medio de 7 jugadores +
 - **Votación MVP** (Ranking → Jornadas): quien jugó vota a los 3 mejores (3, 2 y 1 puntos). El más votado suma +3, el 2.º +2 y el 3.º +1. Los votos son secretos hasta que cierra la votación, 3 días después del inicio del partido.
 - Requiere ejecutar `supabase/002_eventos_y_votos.sql` una vez en el editor SQL.
 
+## Cartas IF
+
+Cada jornada, los 3 mejores (o los 2 o 1 que superen 6 puntos) reciben una carta dorada con su foto, valoración y estadísticas. Se calculan en la propia app con las actas y los votos, así que aparecen solas tras la actualización del martes. Se ven en Inicio y en Ranking → Jornadas, y se pueden compartir como imagen. El diseño está en `cardImage()` de `template.html`.
+
 ## Posiciones y lesionados
 
 - **Posiciones:** cada jugador tiene 1 o 2 posiciones (`POSICIONES` en `template.html`). El lateral juega de defensa o de interior por la banda, y el extremo de delantero o de interior. La posición cuenta según el hueco: gol de defensa +2 extra, de portero +4 extra, y portería a cero (2 goles o menos encajados) +3 si va de portero o defensa. Con el portero lesionado, de portero puede ir cualquier jugador de campo. Los jugadores que aún no salen en Liga Elite se añaden a mano en `EXTRAS` (`template.html`); cuando la liga los publique se usan sus datos reales.
