@@ -24,7 +24,7 @@ Reglas del juego: puntos desde la J4, presupuesto = coste medio de 7 jugadores +
 
 Cada jornada, los 3 mejores (o los 2 o 1 que superen 6 puntos) reciben una carta con su foto, valoración y estadísticas. Se calculan en la propia app con las actas y los votos, así que aparecen solas tras la actualización del martes. Se ven en Inicio y en Ranking → Jornadas, y se pueden compartir como imagen.
 
-La edición cambia sola según la fecha del partido: **IF** (dorada), **Halloween** (24 oct – 1 nov) y **Navidad** (1 dic – 6 ene). Al terminar la temporada aparece el **Equipo de la temporada**: los 7 con más puntos del fantasy, con una carta azul especial. Los diseños son propios, no usan material oficial de ningún juego. Se editan en `EDITIONS` y `cardImage()` de `template.html`.
+La edición cambia sola según la fecha del partido: **IF** (dorada), **Halloween** (24 oct – 1 nov) y **Navidad** (1 dic – 6 ene). Al terminar la temporada aparece el **Equipo de la temporada**: los 7 con más puntos del fantasy, con una carta azul especial. Quien consigue carta recibe además una prima en su valor de mercado (+0,5, +0,3 y +0,2 M€ para el 1.º, 2.º y 3.º) y una etiqueta de carta especial en el Mercado hasta el siguiente partido. Los diseños son propios, no usan material oficial de ningún juego. Se editan en `EDITIONS` y `cardImage()` de `template.html`.
 
 ## Posiciones y lesionados
 

@@ -354,10 +354,18 @@ function compute(){
   P.forEach(p=>{
     p.hurt=injuredAt(p.id,NEXT.jornada);
     p.log=PLAYED.filter(m=>m.jornada>=(p.j.desde||0)).map(m=>({m,...scoreOf(p,m)}));
+    p.cards=[];
+  });
+  // cartas: los mejores de cada jornada reciben una prima en su valor de mercado
+  PLAYED.forEach(m=>bestOfRound(m.jornada).forEach((r,i)=>r.p.cards.push({j:m.jornada,place:i+1,ed:editionFor(m.jornada)})));
+  const lastJ=PLAYED.length?PLAYED[PLAYED.length-1].jornada:null;
+  P.forEach(p=>{
+    p.award=p.cards.find(c=>c.j===lastJ)||null;     // carta especial vigente hasta el siguiente partido
     // valor de mercado: sube o baja con cada partido jugado, también J2 y J3
     let v=VALUE0; p.hist=[VALUE0];
     p.log.forEach(x=>{
-      x.delta=x.lesion?0:x.ausente?-0.5:clamp((x.pts-3)*0.25,-1.5,2.5);
+      const card=p.cards.find(c=>c.j===x.m.jornada);
+      x.delta=(x.lesion?0:x.ausente?-0.5:clamp((x.pts-3)*0.25,-1.5,2.5))+(card?CARD_BONUS[card.place-1]:0);
       v=clamp(Math.round((v+x.delta)*10)/10,VALUE_MIN,VALUE_MAX); x.value=v; p.hist.push(v);
     });
     p.value=v; p.lastDelta=p.log.length?p.log[p.log.length-1].delta:0;
@@ -510,7 +518,7 @@ function viewMarket(){
     <div class="chipsel" style="gap:6px">${[["value","Valor"],["form","Racha"],["pts","Puntos"]].map(([k,l])=>`<button data-ms="${k}" aria-pressed="${msort===k}" style="padding:5px 10px;font-size:12px">${l}</button>`).join("")}</div></div>
    <div class="list">${r.map(p=>`<button class="row" data-player="${p.id}">
      <div class="av">${faceOf(p,p.num)}</div>
-     <div class="grow"><b>${p.n} ${p.hurt?'<span class="posdot" style="background:var(--warn)">LESIONADO</span>':""} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">${posPills(p)} ${p.pj} PJ · ${p.j.goles} G</span></div>
+     <div class="grow"><b>${p.n} ${cardBadge(p)} ${p.hurt?'<span class="posdot" style="background:var(--warn)">LESIONADO</span>':""} ${p.hot?'<span class="posdot" style="background:var(--gold);color:#2a1d00">RACHA</span>':""}</b><span class="sub" style="white-space:nowrap">${posPills(p)} ${p.pj} PJ · ${p.j.goles} G</span></div>
      ${spark(p.hist)}
      <div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`).join("")}</div></section>
   <p class="note">El valor de cada jugador sube o baja tras cada partido según su rendimiento. Toca un jugador para ver su ficha, marcarlo como lesionado o cambiar su foto.</p>`;
@@ -561,7 +569,7 @@ function viewRank(){
   const seg=`<div class="glass seg" role="group" aria-label="Vista"><button data-rv="fant" aria-pressed="${rankView==="fant"}">Fantasy</button><button data-rv="jor" aria-pressed="${rankView==="jor"}">Jornadas</button><button data-rv="reg" aria-pressed="${rankView==="reg"}">Baremo</button></div>`;
   if(rankView==="reg") return seg+`<section class="glass"><div class="sec"><h2>Baremo</h2><span class="eyebrow">Desde la J${START_JORNADA}</span></div><div class="rules">${RULES.map(([k,v])=>`<span>${k}</span><span>${v}</span>`).join("")}</div></section>
     <section class="glass card"><h3>Votación del MVP</h3><p class="sub" style="margin:0">Después de cada partido, quienes jugaron votan a los 3 mejores: 3, 2 y 1 puntos. No vale votarse. La votación cierra a los ${VOTE_DAYS} días del inicio del partido. El más votado es el MVP y suma +${MVP_BONUS[0]}, el segundo +${MVP_BONUS[1]} y el tercero +${MVP_BONUS[2]}. Si hay empate, todos los empatados suman lo mismo.</p></section>
-    <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€."}</p></section>`;
+    <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€. Quien consigue carta en una jornada recibe una prima extra: +0,5, +0,3 y +0,2 M€ para el 1.º, 2.º y 3.º."}</p></section>`;
   if(rankView==="jor"){
     const segj=`<div class="glass seg" role="group" aria-label="Jornada">${PLAYED.map(x=>`<button data-j="${x.jornada}" aria-pressed="${x.jornada===jsel}">J${x.jornada}</button>`).join("")}</div>`;
     const m=PLAYED.find(x=>x.jornada===jsel); return seg+segj+(m?matchLog(m):"");
@@ -601,6 +609,7 @@ function profile(id){
   return `<div class="grab"></div><div class="profile">
     ${canEdit(p)?`<label class="avbtn"><div class="av bigav">${faceOf(p,p.num)}</div><span class="cam">Cambiar foto</span><input type="file" accept="image/*" data-photo="${p.id}" aria-label="Foto de ${p.n}"></label>`:`<div class="av bigav">${faceOf(p,p.num)}</div>`}
     <div><h2>${p.full}</h2><div class="sub">${p.n} · #${p.num}${p.hot?" · en racha":""}</div></div>
+    ${p.cards.length?`<div class="chipsel" style="justify-content:center">${p.cards.map(c=>`<button data-card="${c.j}:${p.id}" style="background:${c.ed.frame[1]};color:#1a1200;border-color:transparent">${c.ed.label} · J${c.j} · ${c.place}.º</button>`).join("")}</div>`:""}
     <div class="chipsel" style="justify-content:center">${p.pos.map(x=>`<span class="posdot p-${x}" style="font-size:12px;padding:4px 10px">${POS[x]}</span>`).join("")}</div>
     ${injuryBox(p)}
     <div class="stats"><div class="stat"><b>${money(p.value)}</b><span class="sub">Valor</span></div><div class="stat"><b>${p.pj}</b><span class="sub">Partidos</span></div><div class="stat"><b>${p.j.goles}</b><span class="sub">Goles</span></div><div class="stat"><b>${p.j.asistencias}</b><span class="sub">Asist.</span></div></div>
@@ -609,6 +618,7 @@ function profile(id){
     ${CLOUD&&ME&&ME.player_id===p.id?'<button class="btn ghost" data-act="logout" style="width:100%">Cerrar sesión</button>':""}
     <button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`;
 }
+const cardBadge=p=>p.award?`<span class="posdot" style="background:${p.award.ed.frame[1]};color:#1a1200">${p.award.ed.label}</span>`:"";
 const posPills=p=>p.pos.map(x=>`<span class="posdot p-${x}">${POS_CORTO[x]}</span>`).join(" ");
 function pickSheet(i){
   const role=slotRole(i), used=new Set(S.slots.filter((x,j)=>x&&j!==i)), base=BUDGET-(spent()-(S.slots[i]?byId(S.slots[i]).value:0));
@@ -619,12 +629,13 @@ function pickSheet(i){
   return `<div class="grab"></div><div class="sec"><h2>Elige tu ${ROLE_NAME[role]}</h2><span class="sub">Te quedan ${money(Math.max(0,base))}${rest.length?" para "+(rest.length+1)+" huecos":""} · <button data-act="close" style="color:var(--accent);font-weight:700">Cerrar</button></span></div>
    ${improv?'<p class="sub" style="padding:0 16px 8px;margin:0">Arturo está lesionado: puede jugar de portero cualquier jugador de campo.</p>':""}
    <div class="list">${list.map(p=>{const no=why(p);return `<button class="row" data-pick="${p.id}" ${no?"disabled":""}>
-     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub" style="white-space:nowrap">${no?no:posPills(p)+" "+p.pj+" PJ · "+p.avg.toFixed(1)+" pts"}</span></div>
+     <div class="av">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b><span class="sub" style="white-space:nowrap">${no?no:cardBadge(p)+" "+posPills(p)+" "+p.pj+" PJ · "+p.avg.toFixed(1)+" pts"}</span></div>
      ${spark(p.hist)}<div class="val"><b>${money(p.value)}</b>${deltaHtml(p.lastDelta)}</div></button>`}).join("")||'<p class="sub" style="padding:16px">Ningún jugador disponible puede jugar ahí.</p>'}
    ${S.slots[i]?'<button class="row" data-pick="0"><div class="grow"><b class="neg">Quitar jugador</b></div></button>':""}</div>`;
 }
 
 /* ── Cartas: los mejores de cada jornada y el equipo de la temporada, generadas solas con las actas ── */
+const CARD_BONUS = [0.5,0.3,0.2];  // prima de valor de mercado (M€) para el 1.º, 2.º y 3.º de cada jornada
 const CARD_MIN = 6;                // puntos mínimos de la jornada para merecer carta
 const CARDS = new Map();
 // Ediciones: se eligen solas según la fecha del partido. Todas son diseños propios.
@@ -645,7 +656,7 @@ function bestOfRound(j){
   const tally=voteTally(j), votes=votesClosed(j)&&tally.length?new Map(tally.map(t=>[t.p.id,t.pts])):new Map();
   return P.map(p=>({p,x:p.log.find(l=>l.m.jornada===j),vp:votes.get(p.id)||0}))
     .filter(r=>r.x&&!r.x.lesion&&!r.x.ausente&&r.x.pts>=CARD_MIN)
-    .sort((a,b)=>b.vp-a.vp||b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||b.p.value-a.p.value).slice(0,3);
+    .sort((a,b)=>b.vp-a.vp||b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||sum(b.p.log.map(l=>l.pts))-sum(a.p.log.map(l=>l.pts))||a.p.id-b.p.id).slice(0,3);
 }
 const seasonDone=()=>PLAYED.length>=DATA.partidos.filter(m=>!m.descansa).length;
 function bestOfSeason(force){                    // los 7 con más puntos del fantasy al acabar la temporada
