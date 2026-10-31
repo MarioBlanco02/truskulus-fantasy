@@ -284,6 +284,8 @@ const injuredAt=(pid,j)=>INJ.some(r=>r.player_id===pid&&j>=r.since&&(r.until==nu
 const LOCAL_ME={id:"local",player_id:null};
 const meRow=()=>CLOUD?ME:LOCAL_ME;
 const myPlayerId=()=>CLOUD?(ME&&ME.player_id):null;
+const ADMIN_PLAYERS = [9005];     // Mario Blanco: ve las herramientas de publicación en Instagram
+const isAdmin=()=>!CLOUD||(ME&&ADMIN_PLAYERS.includes(ME.player_id));
 const canEdit=p=>!CLOUD||(ME&&ME.player_id===p.id);
 const mail=pid=>"p"+pid+"@fantasy-truskulus.com";
 function toast(msg){
@@ -794,7 +796,7 @@ function cardsSection(j,title){
   if(!best.length) return "";
   return `<section class="glass"><div class="sec"><h2>${title||editionFor(j).titulo}</h2><span class="eyebrow">${j==="T"?"Temporada":"Jornada "+j}</span></div>
     <div class="cards">${best.map(r=>`<button class="cardbtn" data-card="${j}:${r.p.id}" aria-label="Carta de ${r.p.n}"><span class="ph"></span></button>`).join("")}</div>
-    ${j==="T"?"":`<div style="padding:0 16px 16px"><button class="btn ghost" data-insta="${j}" style="width:100%">Texto para Instagram</button></div>`}</section>`;
+    ${j==="T"||!isAdmin()?"":`<div style="padding:0 16px 16px"><button class="btn ghost" data-insta="${j}" style="width:100%">Publicación para Instagram</button></div>`}</section>`;
 }
 async function hydrateCards(){
   for(const el of document.querySelectorAll("[data-card]")){
@@ -834,6 +836,28 @@ function instaCaption(j){
   ];
   return bloques.filter(Boolean).join("\n\n");
 }
+function postBackground(g,ed,W,H,seed){
+  const bg=g.createLinearGradient(0,0,0,H);bg.addColorStop(0,ed.dark[0]);bg.addColorStop(.6,ed.dark[1]);bg.addColorStop(1,ed.dark[2]);g.fillStyle=bg;g.fillRect(0,0,W,H);
+  const gl=g.createRadialGradient(W/2,640,40,W/2,640,820);gl.addColorStop(0,`rgba(${ed.glow},.42)`);gl.addColorStop(1,`rgba(${ed.glow},0)`);g.fillStyle=gl;g.fillRect(0,0,W,H);
+  decorate(g,ed,seed);
+}
+async function cardPost(r,j){                      // una sola carta, entera y centrada, en formato 4:5 para subirla tal cual
+  const ed=editionFor(j), m=j==="T"?null:matchOf(j), key="post|"+j+"|"+r.p.id+"|"+ovrAt(r.p,j)+"|"+ed.label+"|"+r.x.pts;
+  if(CARDS.has(key)) return CARDS.get(key);
+  const cd=await cardImage(r,j);
+  try{await document.fonts.load('800 60px "Bricolage Grotesque"')}catch(e){}
+  const W=1080,H=1350,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
+  const F='"Bricolage Grotesque",-apple-system,"Helvetica Neue",Arial,sans-serif';
+  postBackground(g,ed,W,H,r.p.id*17+3);
+  g.textAlign="center";g.fillStyle=ed.text;g.font='800 56px '+F;try{g.letterSpacing="4px"}catch(e){}
+  g.fillText("CARTA "+ed.label,W/2,118);try{g.letterSpacing="2px"}catch(e){}
+  g.font='700 32px '+F;g.fillStyle="#fff";g.fillText((j==="T"?"TEMPORADA 2026/27":"JORNADA "+j)+" · "+TEAM.toUpperCase(),W/2,168);try{g.letterSpacing="0px"}catch(e){}
+  const cw=680,ch=cw*880/600,x0=(W-cw)/2,y0=205;
+  g.save();g.shadowColor="rgba(0,0,0,.65)";g.shadowBlur=46;g.shadowOffsetY=20;g.drawImage(cd.canvas,x0,y0,cw,ch);g.restore();
+  g.fillStyle="#fff";g.font='800 44px '+F;
+  g.fillText(m?m.local+"  "+m.golesLocal+" – "+m.golesVisitante+"  "+m.visitante:"EQUIPO DE LA TEMPORADA",W/2,H-80);
+  const url=c.toDataURL("image/png"); CARDS.set(key,{url,canvas:c}); return CARDS.get(key);
+}
 async function instaImage(j){                       // imagen 4:5 para el feed de Instagram con las cartas de la jornada
   const best=entriesFor(j), ed=editionFor(j), m=matchOf(j), key="insta|"+j+"|"+best.map(r=>r.p.id+":"+ovrAt(r.p,j)).join(",")+"|"+ed.label;
   if(CARDS.has(key)) return CARDS.get(key);
@@ -841,9 +865,7 @@ async function instaImage(j){                       // imagen 4:5 para el feed d
   try{await document.fonts.load('800 60px "Bricolage Grotesque"')}catch(e){}
   const W=1080,H=1350,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
   const F='"Bricolage Grotesque",-apple-system,"Helvetica Neue",Arial,sans-serif';
-  const bg=g.createLinearGradient(0,0,0,H);bg.addColorStop(0,ed.dark[0]);bg.addColorStop(.6,ed.dark[1]);bg.addColorStop(1,ed.dark[2]);g.fillStyle=bg;g.fillRect(0,0,W,H);
-  const gl=g.createRadialGradient(W/2,640,40,W/2,640,820);gl.addColorStop(0,`rgba(${ed.glow},.42)`);gl.addColorStop(1,`rgba(${ed.glow},0)`);g.fillStyle=gl;g.fillRect(0,0,W,H);
-  g.save();g.translate(0,0);decorate(g,ed,j*131+5);g.restore();
+  postBackground(g,ed,W,H,j*131+5);
   g.textAlign="center";g.fillStyle=ed.text;g.font='800 70px '+F;try{g.letterSpacing="4px"}catch(e){}
   g.fillText("CARTAS "+ed.label,W/2,150);try{g.letterSpacing="2px"}catch(e){}
   g.font='700 38px '+F;g.fillStyle="#fff";g.fillText("JORNADA "+j+" · "+TEAM.toUpperCase(),W/2,212);try{g.letterSpacing="0px"}catch(e){}
@@ -880,8 +902,17 @@ async function openCard(key){
   const c=await cardImage(r,j);
   sheet(`<div class="grab"></div><div class="profile"><img class="bigcard" src="${c.url}" alt="Carta de ${r.p.n}">
     <div class="sub">Mantén pulsada la carta para guardarla, o compártela con el botón.</div>
-    <button class="btn" data-sharecard="${key}" style="width:100%">Compartir carta</button>
+    ${isAdmin()?`<button class="btn" data-sharepost="${key}" style="width:100%">Descargar o compartir para Instagram (4:5)</button><button class="btn ghost" data-sharecard="${key}" style="width:100%">Carta sola (PNG)</button>`:`<button class="btn" data-sharecard="${key}" style="width:100%">Compartir carta</button>`}
     <button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`);
+}
+async function sharePost(key){
+  const [js,pid]=key.split(":"), j=js==="T"?"T":+js, r=entriesFor(j).find(x=>x.p.id===+pid); if(!r) return;
+  const {canvas}=await cardPost(r,j), name="instagram-"+norm(r.p.n).replace(/\W+/g,"-")+"-"+(j==="T"?"temporada":"J"+j)+".png";
+  canvas.toBlob(async b=>{
+    const f=new File([b],name,{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:"Carta · "+r.p.n})}catch(e){}return}
+    try{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click();toast("Imagen guardada")}catch(e){toast("Mantén pulsada la imagen para guardarla")}
+  },"image/png");
 }
 async function shareCard(key){
   const [js,pid]=key.split(":"), j=js==="T"?"T":+js, r=entriesFor(j).find(x=>x.p.id===+pid); if(!r) return;
@@ -918,7 +949,7 @@ document.addEventListener("change",e=>{
   });
 });
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-ev],[data-gotovote],[data-card],[data-sharecard],[data-insta],[data-shareinsta],[data-form],[data-cap],[data-injure],[data-heal],[data-mf],[data-ms],[data-rv],[data-player]"); if(!t)return;
+  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-ev],[data-gotovote],[data-card],[data-sharecard],[data-sharepost],[data-insta],[data-shareinsta],[data-form],[data-cap],[data-injure],[data-heal],[data-mf],[data-ms],[data-rv],[data-player]"); if(!t)return;
   const d=t.dataset;
   if(d.act==="close"){ if(t.classList.contains("scrim")&&e.target.closest(".sheet"))return; sheet(""); return }
   if(d.tab){tab=d.tab;sheet("");render();window.scrollTo(0,0)}
@@ -942,6 +973,7 @@ document.addEventListener("click",e=>{
   else if(d.act==="copyinsta"){copyInsta()}
   else if(d.card){openCard(d.card)}
   else if(d.sharecard){shareCard(d.sharecard)}
+  else if(d.sharepost){sharePost(d.sharepost)}
   else if(d.gotovote){tab="rank";rankView="jor";jsel=+d.gotovote;render();window.scrollTo(0,0)}
   else if(d.ev&&!t.disabled){const[j,pid,k,dl]=d.ev.split(":");changeEvent(+j,+pid,k,+dl)}
   else if(d.join){sheet(joinSheet(+d.join))}
