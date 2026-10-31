@@ -1,5 +1,8 @@
 .env
 __pycache__/
 index.html
+node_modules/
+publicacion/
 salida/
+site-local/
 site/

@@ -1,0 +1,55 @@
+name: Publicación semanal de cartas
+
+on:
+  schedule:
+    - cron: "0 19 * * 3"       # cada miércoles a las 19:00 UTC (21:00 o 20:00 en Madrid), ya cerrada la votación
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: pip install pillow
+      - run: python scrape.py data.json
+      - run: python build.py
+      - run: npm install --no-save playwright && npx playwright install --with-deps chromium
+      - name: Generar las imágenes y el texto
+        run: node scripts/publicacion.mjs
+      - name: Guardar los archivos (solo los ves tú, con tu sesión de GitHub)
+        if: ${{ hashFiles('publicacion/jornada.txt') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: publicacion-instagram
+          path: publicacion/
+          retention-days: 30
+      - name: Avisarte con una incidencia
+        if: ${{ hashFiles('publicacion/jornada.txt') != '' }}
+        run: |
+          J=$(cat publicacion/jornada.txt); ED=$(cat publicacion/edicion.txt)
+          TITLE="Publicación Instagram · Jornada $J ($ED)"
+          if [ -n "$(gh issue list --state all --search "\"$TITLE\" in:title" --json number --jq '.[0].number')" ]; then echo "Ya avisada."; exit 0; fi
+          {
+            echo "Las cartas de la jornada $J ya están listas para subir."
+            echo
+            echo "**Imágenes (formato 4:5, listas para Instagram):** abre esta ejecución y descarga \`publicacion-instagram\` en *Artifacts*: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            echo "**Texto para copiar:**"
+            echo
+            echo '```'
+            cat "publicacion/texto-J$J.txt"
+            echo '```'
+          } > cuerpo.md
+          gh issue create --title "$TITLE" --body-file cuerpo.md

@@ -18,4 +18,9 @@ page = ('<!doctype html><html lang="es"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
         '<meta name="theme-color" content="#07120d">' + html + "</html>")
 open("site/index.html", "w", encoding="utf-8").write(page)
+# Versión sin servidor (solo para generar la publicación semanal desde la automatización; no se publica)
+os.makedirs("site-local", exist_ok=True)
+local = tpl.replace("/*DATA*/", data).replace("/*CONFIG*/", "null").replace("<!--SUPABASE_SCRIPT-->", "")
+open("site-local/index.html", "w", encoding="utf-8").write('<!doctype html><html lang="es"><head><meta charset="utf-8">'
+    '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' + local + "</html>")
 print("index.html y site/index.html generados", "con Supabase" if lib else "en modo local")

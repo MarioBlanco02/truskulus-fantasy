@@ -285,7 +285,10 @@ const LOCAL_ME={id:"local",player_id:null};
 const meRow=()=>CLOUD?ME:LOCAL_ME;
 const myPlayerId=()=>CLOUD?(ME&&ME.player_id):null;
 const ADMIN_PLAYERS = [9005];     // Mario Blanco: ve las herramientas de publicación en Instagram
-const isAdmin=()=>!CLOUD||(ME&&ADMIN_PLAYERS.includes(ME.player_id));
+function adminLocal(){                                   // sin servidor: solo en la vista previa de Claude o con #admin en la dirección
+  try{if(location.hash==="#admin")localStorage.setItem("ft-admin","1");return localStorage.getItem("ft-admin")==="1"}catch(e){return false}
+}
+const isAdmin=()=>CLOUD?!!(ME&&ADMIN_PLAYERS.includes(ME.player_id)):(!!window.claude||adminLocal());
 const canEdit=p=>!CLOUD||(ME&&ME.player_id===p.id);
 const mail=pid=>"p"+pid+"@fantasy-truskulus.com";
 function toast(msg){
@@ -876,6 +879,7 @@ async function instaImage(j){                       // imagen 4:5 para el feed d
   const url=c.toDataURL("image/png"); CARDS.set(key,{url,canvas:c}); return CARDS.get(key);
 }
 function openInsta(j){
+  if(!isAdmin()) return;
   const t=instaCaption(j);
   sheet(`<div class="grab"></div><div class="profile"><h2>Publicación para Instagram</h2>
     <img class="bigcard" id="instaimg" alt="Imagen de la publicación" style="aspect-ratio:4/5;background:var(--glass-strong);border-radius:14px">
@@ -886,6 +890,7 @@ function openInsta(j){
   instaImage(j).then(c=>{const im=document.getElementById("instaimg");if(im)im.src=c.url});
 }
 async function shareInsta(j){
+  if(!isAdmin()) return;
   const {canvas}=await instaImage(j), name="instagram-jornada-"+j+".png";
   canvas.toBlob(async b=>{
     const f=new File([b],name,{type:"image/png"});
@@ -906,6 +911,7 @@ async function openCard(key){
     <button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`);
 }
 async function sharePost(key){
+  if(!isAdmin()) return;
   const [js,pid]=key.split(":"), j=js==="T"?"T":+js, r=entriesFor(j).find(x=>x.p.id===+pid); if(!r) return;
   const {canvas}=await cardPost(r,j), name="instagram-"+norm(r.p.n).replace(/\W+/g,"-")+"-"+(j==="T"?"temporada":"J"+j)+".png";
   canvas.toBlob(async b=>{
