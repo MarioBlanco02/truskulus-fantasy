@@ -1,4 +1,5 @@
-index.html
-site/
-__pycache__/
 .env
+__pycache__/
+index.html
+salida/
+site/
