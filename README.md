@@ -30,6 +30,10 @@ Las cartas se revelan solas cuando cierra la votación del MVP (hasta entonces s
 
 Cada miércoles a las 19:00 UTC (después de cerrarse la votación) el flujo `publicacion.yml` genera las imágenes 4:5 de las cartas y el texto para Instagram con `scripts/publicacion.mjs`, los guarda como *artifact* de la ejecución y abre una incidencia en el repositorio con el texto. Solo lo ve quien tenga acceso al repositorio (tú), y GitHub te avisa por correo. También se puede lanzar a mano desde *Actions → Publicación semanal de cartas → Run workflow*.
 
+## Tu alineación y puntos
+
+En Ranking → Jornadas, cada jornada que cuenta (desde la J4) muestra tu 7 sobre el campo con los puntos de cada jugador y, debajo, el desglose de dónde salen: jugar, goles, asistencias, tarjetas, bonus por el hueco, portería a cero, votación del MVP y capitán x2. En Inicio hay un acceso a tus puntos de la última jornada, y en la clasificación del fantasy se puede tocar a un compañero para ver su 7 (visible desde que empieza el partido).
+
 ## Posiciones y lesionados
 
 - **Posiciones:** cada jugador tiene 1 o 2 posiciones (`POSICIONES` en `template.html`). El lateral juega de defensa o de interior por la banda, y el extremo de delantero o de interior. La posición cuenta según el hueco: gol de defensa +2 extra, de portero +4 extra, y portería a cero (2 goles o menos encajados) +3 si va de portero o defensa. Con el portero lesionado, de portero puede ir cualquier jugador de campo. Los jugadores que aún no salen en Liga Elite se añaden a mano en `EXTRAS` (`template.html`); cuando la liga los publique se usan sus datos reales.
