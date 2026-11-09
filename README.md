@@ -34,6 +34,10 @@ Cada miércoles a las 19:00 UTC (después de cerrarse la votación) el flujo `pu
 
 En Ranking → Jornadas, cada jornada que cuenta (desde la J4) muestra tu 7 sobre el campo con los puntos de cada jugador y, debajo, el desglose de dónde salen: jugar, goles, asistencias, tarjetas, bonus por el hueco, portería a cero, votación del MVP y capitán x2. En Inicio hay un acceso a tus puntos de la última jornada, y en la clasificación del fantasy se puede tocar a un compañero para ver su 7 (visible desde que empieza el partido).
 
+## Empates en la votación
+
+Con empate los jugadores suman lo mismo y se salta el puesto siguiente (dos primeros con +3, el siguiente con +1). Si nadie vota, nadie recibe el bonus de MVP y las cartas se dan por puntos. Para las 2 cartas de la jornada se desempata por: votos, votos de primer puesto, puntos de la jornada, goles, asistencias y puntos acumulados.
+
 ## Votar al MVP
 
 Mientras la votación está abierta, aparece un aviso arriba de **Inicio** y de **Ranking**, y un botón "Votar MVP" en "Tu alineación", que abre la votación en una hoja sin salir de la pantalla. Por defecto solo votan quienes jugaron el partido (`VOTE_ONLY_PLAYED` en `template.html`).

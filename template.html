@@ -318,8 +318,9 @@ function voteTally(j){
 function voteBonus(j){                         // Map jugador → {bonus, lugar} con la votación cerrada; null = usar el MVP de la liga
   if(!votesClosed(j)) return null;
   const t=voteTally(j); if(!t.length) return null;
-  const levels=[...new Set(t.map(x=>x.pts))].slice(0,3), out=new Map();
-  t.forEach(x=>{const i=levels.indexOf(x.pts); if(i>=0) out.set(x.p.id,{bonus:MVP_BONUS[i],lugar:i+1})});
+  const out=new Map();
+  t.forEach(x=>{const lugar=t.findIndex(y=>y.pts===x.pts)+1;      // empate: mismo puesto y se salta el siguiente (1, 1, 3…)
+    if(lugar<=MVP_BONUS.length) out.set(x.p.id,{bonus:MVP_BONUS[lugar-1],lugar})});
   return out;
 }
 const PLAYED = DATA.partidos.filter(m=>m.estado===5).sort((a,b)=>a.jornada-b.jornada);
@@ -591,7 +592,7 @@ function viewRank(){
   const vb=voteBanner();
   const seg=vb+`<div class="glass seg" role="group" aria-label="Vista"><button data-rv="fant" aria-pressed="${rankView==="fant"}">Fantasy</button><button data-rv="jor" aria-pressed="${rankView==="jor"}">Jornadas</button><button data-rv="reg" aria-pressed="${rankView==="reg"}">Baremo</button></div>`;
   if(rankView==="reg") return seg+`<section class="glass"><div class="sec"><h2>Baremo</h2><span class="eyebrow">Desde la J${START_JORNADA}</span></div><div class="rules">${RULES.map(([k,v])=>`<span>${k}</span><span>${v}</span>`).join("")}</div></section>
-    <section class="glass card"><h3>Votación del MVP</h3><p class="sub" style="margin:0">Después de cada partido, quienes jugaron votan a los 3 mejores: 3, 2 y 1 puntos. No vale votarse. La votación cierra a los ${VOTE_DAYS} días del inicio del partido. El más votado es el MVP y suma +${MVP_BONUS[0]}, el segundo +${MVP_BONUS[1]} y el tercero +${MVP_BONUS[2]}. Si hay empate, todos los empatados suman lo mismo.</p></section>
+    <section class="glass card"><h3>Votación del MVP</h3><p class="sub" style="margin:0">Después de cada partido, quienes jugaron votan a los 3 mejores: 3, 2 y 1 puntos. No vale votarse. La votación cierra a los ${VOTE_DAYS} días del inicio del partido. El más votado es el MVP y suma +${MVP_BONUS[0]}, el segundo +${MVP_BONUS[1]} y el tercero +${MVP_BONUS[2]}. Si hay empate, los empatados suman lo mismo y se salta el puesto siguiente (dos primeros, luego tercero).</p></section>
     <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€. Quien consigue carta en una jornada recibe una prima extra: +0,5 M€ el 1.º y +0,3 M€ el 2.º."}</p></section>`;
   if(rankView==="jor"){
     const segj=`<div class="glass seg" role="group" aria-label="Jornada">${PLAYED.map(x=>`<button data-j="${x.jornada}" aria-pressed="${x.jornada===jsel}">J${x.jornada}</button>`).join("")}</div>`;
@@ -695,9 +696,10 @@ function editionFor(j){
 function bestOfRound(j){
   if(!votesClosed(j)) return [];                 // las cartas se generan solas cuando cierra la votación
   const tally=voteTally(j), votes=votesClosed(j)&&tally.length?new Map(tally.map(t=>[t.p.id,t.pts])):new Map();
+  const primeros=id=>VOTES.filter(v=>v.jornada===j&&v.first===id).length;       // desempate: más votos de primer puesto
   return P.map(p=>({p,x:p.log.find(l=>l.m.jornada===j),vp:votes.get(p.id)||0}))
     .filter(r=>r.x&&!r.x.lesion&&!r.x.ausente&&r.x.pts>=CARD_MIN)
-    .sort((a,b)=>b.vp-a.vp||b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||sum(b.p.log.map(l=>l.pts))-sum(a.p.log.map(l=>l.pts))||a.p.id-b.p.id).slice(0,2);
+    .sort((a,b)=>b.vp-a.vp||primeros(b.p.id)-primeros(a.p.id)||b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||sum(b.p.log.map(l=>l.pts))-sum(a.p.log.map(l=>l.pts))||a.p.id-b.p.id).slice(0,2);
 }
 const seasonDone=()=>PLAYED.length>=DATA.partidos.filter(m=>!m.descansa).length;
 function bestOfSeason(force){                    // los 7 con más puntos del fantasy al acabar la temporada
