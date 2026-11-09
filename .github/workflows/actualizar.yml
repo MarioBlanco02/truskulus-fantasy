@@ -6,7 +6,7 @@ on:
   workflow_dispatch:           # botón "Run workflow" para actualizar a mano
   push:
     branches: [main]
-    paths: [template.html, build.py, scrape.py, scripts/**, .github/workflows/**]
+    paths: [template.html, build.py, scrape.py, data.json, scripts/**, .github/workflows/**]
 
 permissions:
   contents: write
