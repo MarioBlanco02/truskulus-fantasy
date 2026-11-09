@@ -34,6 +34,10 @@ Cada miércoles a las 19:00 UTC (después de cerrarse la votación) el flujo `pu
 
 En Ranking → Jornadas, cada jornada que cuenta (desde la J4) muestra tu 7 sobre el campo con los puntos de cada jugador y, debajo, el desglose de dónde salen: jugar, goles, asistencias, tarjetas, bonus por el hueco, portería a cero, votación del MVP y capitán x2. En Inicio hay un acceso a tus puntos de la última jornada, y en la clasificación del fantasy se puede tocar a un compañero para ver su 7 (visible desde que empieza el partido).
 
+## Votar al MVP
+
+Mientras la votación está abierta, aparece un aviso arriba de **Inicio** y de **Ranking**, y un botón "Votar MVP" en "Tu alineación", que abre la votación en una hoja sin salir de la pantalla. Por defecto solo votan quienes jugaron el partido (`VOTE_ONLY_PLAYED` en `template.html`).
+
 ## Posiciones y lesionados
 
 - **Posiciones:** cada jugador tiene 1 o 2 posiciones (`POSICIONES` en `template.html`). El lateral juega de defensa o de interior por la banda, y el extremo de delantero o de interior. La posición cuenta según el hueco: gol de defensa +2 extra, de portero +4 extra, y portería a cero (2 goles o menos encajados) +3 si va de portero o defensa. Con el portero lesionado, de portero puede ir cualquier jugador de campo. Los jugadores que aún no salen en Liga Elite se añaden a mano en `EXTRAS` (`template.html`); cuando la liga los publique se usan sus datos reales.

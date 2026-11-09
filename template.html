@@ -227,6 +227,7 @@ const DATA = /*DATA*/;
 const TEAM = DATA.equipo, TEAM_ID = DATA.equipoId;
 
 /* ── Reglas del juego ── */
+const VOTE_ONLY_PLAYED = true;    // true: solo votan quienes jugaron el partido; false: vota todo el equipo
 const VOTE_DAYS = 3, EVENT_DAYS = 7;   // plazo para votar el MVP y para apuntar eventos, desde el inicio del partido
 const START_JORNADA = 4;           // los puntos del fantasy empiezan a contar aquí; J2 y J3 solo calibran el mercado
 const BUDGET_FACTOR = 1.05;        // el presupuesto es el coste medio de 7 jugadores +5 %, y se recalcula con el mercado
@@ -478,11 +479,11 @@ function viewHome(){
   const mv=p=>`<button class="mv" data-player="${p.id}"><div class="av" style="--s:34px">${faceOf(p,p.num)}</div><div class="grow"><b>${p.n}</b>${deltaHtml(p.lastDelta)}</div></button>`;
   const pct=Math.min(100,spent()/BUDGET*100);
   const lj=PLAYED.length?PLAYED[PLAYED.length-1].jornada:null;
-  const pending=CLOUD&&lj&&voteOpen(lj)&&!myVote(lj)&&ME&&playedIds(matchOf(lj)).some(p=>p.id===ME.player_id);
+  const pending=false;
   const lastJ=PLAYED.length?PLAYED[PLAYED.length-1].jornada:null;
   const misPuntos=(()=>{if(!lastJ||lastJ<START_JORNADA)return "";const l=lineupFor(lastJ);const bd=l&&lineupBreakdown(l);
     return bd?`<button class="glass card" style="text-align:left" data-gotolineup="${lastJ}"><div class="eyebrow">Tus puntos · J${lastJ}</div><div style="display:flex;justify-content:space-between;align-items:baseline"><b class="num" style="font-size:34px">${fmt(bd.total)}</b><span class="sub">Ver de dónde vienen</span></div></button>`:""})();
-  return misPuntos+(lastJ?cardsSection(lastJ):"")+(pending?`<button class="glass card" style="text-align:left" data-gotovote="${lj}"><div class="eyebrow">Votación abierta</div><b class="num" style="font-size:18px">Vota a los 3 mejores de la J${lj}</b><span class="sub">Cierra el ${fmtClose(lj)}</span></button>`:"")+`<section class="glass hero">
+  return voteBanner()+misPuntos+(lastJ?cardsSection(lastJ):"")+(pending?`<button class="glass card" style="text-align:left" data-gotovote="${lj}"><div class="eyebrow">Votación abierta</div><b class="num" style="font-size:18px">Vota a los 3 mejores de la J${lj}</b><span class="sub">Cierra el ${fmtClose(lj)}</span></button>`:"")+`<section class="glass hero">
     <div class="eyebrow" style="text-align:center">Jornada ${NEXT.jornada} · ${S.locked?"Tu 7 está confirmado":"Próximo partido"}</div>
     <div class="vs"><div class="t">${crest(L[0],L[1],58)}<b>${L[1]}</b></div>
       <div class="mid"><span class="num" style="color:var(--muted)">VS</span></div>
@@ -547,7 +548,7 @@ const playedIds=m=>P.filter(p=>{const r=(DATA.estadisticas[m.matchId]||[]).find(
 const fmtClose=j=>new Date(kickoffOf(j)+VOTE_DAYS*864e5).toLocaleDateString("es-ES",{weekday:"long",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Madrid"});
 function votePanel(m){
   const j=m.jornada, pl=playedIds(m), meId=myPlayerId(), my=myVote(j);
-  const canVote=voteOpen(j)&&(!CLOUD||(ME&&pl.some(p=>p.id===ME.player_id)));
+  const canVote=voteOpen(j)&&(!CLOUD||(ME&&(!VOTE_ONLY_PLAYED||pl.some(p=>p.id===ME.player_id))));
   if(canVote){
     const opts=cur=>`<option value="">Elige…</option>`+pl.filter(p=>p.id!==meId).map(p=>`<option value="${p.id}" ${cur===p.id?"selected":""}>${p.n}</option>`).join("");
     const row=(k,l,pts)=>`<label class="votelabel"><span><b>${l}</b> <span class="sub">${pts}</span></span><select class="sel" id="v-${k}">${opts(my&&my[k])}</select></label>`;
@@ -587,7 +588,8 @@ function matchLog(m){
      <div class="val"><div class="pts ${pts<0?"neg":""}" style="${counts?"":"opacity:.55"}">${fmt(pts)}</div>${deltaHtml(delta)}</div></button>`).join("")}</div></section>`;
 }
 function viewRank(){
-  const seg=`<div class="glass seg" role="group" aria-label="Vista"><button data-rv="fant" aria-pressed="${rankView==="fant"}">Fantasy</button><button data-rv="jor" aria-pressed="${rankView==="jor"}">Jornadas</button><button data-rv="reg" aria-pressed="${rankView==="reg"}">Baremo</button></div>`;
+  const vb=voteBanner();
+  const seg=vb+`<div class="glass seg" role="group" aria-label="Vista"><button data-rv="fant" aria-pressed="${rankView==="fant"}">Fantasy</button><button data-rv="jor" aria-pressed="${rankView==="jor"}">Jornadas</button><button data-rv="reg" aria-pressed="${rankView==="reg"}">Baremo</button></div>`;
   if(rankView==="reg") return seg+`<section class="glass"><div class="sec"><h2>Baremo</h2><span class="eyebrow">Desde la J${START_JORNADA}</span></div><div class="rules">${RULES.map(([k,v])=>`<span>${k}</span><span>${v}</span>`).join("")}</div></section>
     <section class="glass card"><h3>Votación del MVP</h3><p class="sub" style="margin:0">Después de cada partido, quienes jugaron votan a los 3 mejores: 3, 2 y 1 puntos. No vale votarse. La votación cierra a los ${VOTE_DAYS} días del inicio del partido. El más votado es el MVP y suma +${MVP_BONUS[0]}, el segundo +${MVP_BONUS[1]} y el tercero +${MVP_BONUS[2]}. Si hay empate, todos los empatados suman lo mismo.</p></section>
     <section class="glass card"><h3>Valor de mercado</h3><p class="sub" style="margin:0">Todos empiezan en ${money(VALUE0)}. Tras cada partido se mueve ${"según los puntos: por encima de 3 sube 0,25 M€ por punto (máx. +2,5) y por debajo baja. Si no se presenta, baja 0,5 M€. Quien consigue carta en una jornada recibe una prima extra: +0,5 M€ el 1.º y +0,3 M€ el 2.º."}</p></section>`;
@@ -968,7 +970,7 @@ document.addEventListener("change",e=>{
   });
 });
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-ev],[data-gotovote],[data-card],[data-mgr],[data-gotolineup],[data-sharecard],[data-sharepost],[data-insta],[data-shareinsta],[data-form],[data-cap],[data-injure],[data-heal],[data-mf],[data-ms],[data-rv],[data-player]"); if(!t)return;
+  const t=e.target.closest("[data-tab],[data-slot],[data-pick],[data-act],[data-j],[data-join],[data-ev],[data-gotovote],[data-card],[data-openvote],[data-mgr],[data-gotolineup],[data-sharecard],[data-sharepost],[data-insta],[data-shareinsta],[data-form],[data-cap],[data-injure],[data-heal],[data-mf],[data-ms],[data-rv],[data-player]"); if(!t)return;
   const d=t.dataset;
   if(d.act==="close"){ if(t.classList.contains("scrim")&&e.target.closest(".sheet"))return; sheet(""); return }
   if(d.tab){tab=d.tab;sheet("");render();window.scrollTo(0,0)}
@@ -987,6 +989,7 @@ document.addEventListener("click",e=>{
   else if(d.act==="unlock"){S.locked=false;persist();render()}
   else if(d.act==="logout"){logout()}
   else if(d.act==="vote"){sendVote()}
+  else if(d.openvote){openVote(+d.openvote)}
   else if(d.mgr){openManager(d.mgr)}
   else if(d.gotolineup){tab="rank";rankView="jor";jsel=+d.gotolineup;render();window.scrollTo(0,0)}
   else if(d.insta){openInsta(+d.insta)}
@@ -1012,6 +1015,18 @@ async function changeEvent(j,pid,kind,delta){
   if(!CLOUD)persistLocal();
   compute();render();
 }
+function voteBanner(){
+  const j=PLAYED.length?PLAYED[PLAYED.length-1].jornada:null; if(!j||j<START_JORNADA||!voteOpen(j)) return "";
+  const m=matchOf(j), pl=playedIds(m), puede=!CLOUD||(ME&&(!VOTE_ONLY_PLAYED||pl.some(p=>p.id===ME.player_id)));
+  if(!puede) return `<div class="glass card"><div class="eyebrow">Votación MVP · J${j}</div><span class="sub">Está abierta hasta el ${fmtClose(j)}. Solo votan quienes jugaron el partido.</span></div>`;
+  const ya=myVote(j);
+  return ya?`<button class="glass card" style="text-align:left" data-openvote="${j}"><div class="eyebrow">Votación MVP · J${j}</div><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b>Ya has votado</b><span class="sub" style="color:var(--accent);font-weight:700">Cambiar mi voto</span></div></button>`
+    :`<button class="glass card" style="text-align:left;border-color:var(--gold)" data-openvote="${j}"><div class="eyebrow" style="color:var(--gold)">Votación abierta · J${j}</div><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b class="num" style="font-size:20px">Vota a los 3 mejores del partido</b></div><span class="sub">Cierra el ${fmtClose(j)}. Solo te lleva un minuto.</span></button>`;
+}
+function openVote(j){
+  jsel=j; const m=matchOf(j);
+  sheet(`<div class="grab"></div><div style="padding:6px 0 0">${votePanel(m)}</div><div style="padding:0 16px"><button class="btn ghost" data-act="close" style="width:100%">Cerrar</button></div>`);
+}
 async function sendVote(){
   const j=jsel, v={first:+document.getElementById("v-first").value,second:+document.getElementById("v-second").value,third:+document.getElementById("v-third").value};
   if(!v.first||!v.second||!v.third){toast("Elige a los tres");return}
@@ -1021,7 +1036,7 @@ async function sendVote(){
   const i=VOTES.findIndex(x=>x.jornada===j&&x.voter===row.voter);
   if(i>=0)VOTES[i]=row;else VOTES.push(row);
   if(!CLOUD)persistLocal();
-  toast("Voto guardado");compute();render();
+  toast("Voto guardado");compute();sheet("");render();
 }
 async function setInjury(pid,on){
   if(on){
@@ -1111,7 +1126,7 @@ function lineupView(bd,titulo){
   return `<section class="glass"><div class="sec"><h2>${titulo}</h2><span class="eyebrow">J${bd.m.jornada} · ${bd.l.formation}</span></div>
     <div style="padding:0 16px 12px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px">
       <div><div class="eyebrow">Puntos de la jornada</div><div class="num" style="font-size:44px;font-weight:800;line-height:1">${fmt(bd.total)}</div></div>
-      <div class="sub" style="text-align:right;max-width:55%">${bd.confirmed?"":"7 sin confirmar: no cuenta para la clasificación. "}${pendiente?"Faltan los puntos de la votación del MVP (cierra el "+fmtClose(bd.m.jornada)+").":""}</div></div>
+      <div class="sub" style="text-align:right;max-width:55%">${!votesClosed(bd.m.jornada)&&voteOpen(bd.m.jornada)?`<button class="chip" data-openvote="${bd.m.jornada}" style="color:var(--accent);font-weight:700;margin-bottom:4px">Votar MVP</button><br>`:""}${bd.confirmed?"":"7 sin confirmar: no cuenta para la clasificación. "}${pendiente?"Faltan los puntos de la votación del MVP (cierra el "+fmtClose(bd.m.jornada)+").":""}</div></div>
     <div class="pitch" style="margin:0 12px 12px" aria-label="Alineación con puntos">${["DEL","MED","DEF","POR"].map(pos=>`<div class="line">${idx[pos].map(slot).join("")}</div>`).join("")}</div>
     <div class="list">${[...bd.rows].sort((a,b)=>b.total-a.total).map(r=>`<button class="row" data-player="${r.p.id}" style="align-items:flex-start"><div class="av">${faceOf(r.p,r.p.num)}</div>
       <div class="grow"><b>${r.p.n} <span class="sub">de ${POS[r.pos]||r.pos}</span></b>
