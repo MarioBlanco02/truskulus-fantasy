@@ -15,6 +15,7 @@ API = "https://api.playooz.com"
 TENANT = "www.ligaelitefutbol.com"
 EVENT_ID = 302      # Zona Sur Domingo Tarde 2026-2027
 TEAM_ID = 1092      # Truskulus FC
+ROUND_ID, GROUP_ID = 163, 521   # Liga regular, grupo Preferente (por si la API ya no los da en el calendario)
 
 
 def get(path):
@@ -59,7 +60,13 @@ def logo_uri(url, size=128):
     return "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def match_row(m):
+def match_row(m, team_name=""):
+    if "homeName" not in m:
+        # formato nuevo de la API: el calendario viene desde el punto de vista del equipo
+        casa = m["isHome"]
+        m = {**m, "homeName": team_name if casa else m.get("rivalName"), "awayName": m.get("rivalName") if casa else team_name,
+             "homeId": TEAM_ID if casa else m.get("rivalId"), "awayId": m.get("rivalId") if casa else TEAM_ID,
+             "scoreHome": m.get("scoreFor") if casa else m.get("scoreAgainst"), "scoreAway": m.get("scoreAgainst") if casa else m.get("scoreFor")}
     return {
         "matchId": m["matchId"], "jornada": m["fixtureNumber"], "fecha": m["date"], "hora": m["start"],
         "campo": m["fieldName"], "local": m["homeName"], "visitante": m["awayName"],
@@ -84,11 +91,22 @@ def player_events(match_id):
 
 
 def matches_round(played, pending):
-    return (played + pending)[0]["roundId"]
+    return (played + pending)[0].get("roundId", ROUND_ID)
 
 
 def matches_group(played, pending):
-    return (played + pending)[0]["groupId"]
+    return (played + pending)[0].get("groupId", GROUP_ID)
+
+
+def squad_players(team):
+    return (team.get("squad") or {}).get("players") or team["players"]
+
+
+def split_calendar(team):
+    cal = team["calendar"]
+    if isinstance(cal, dict):
+        return cal["played"], cal["pending"]
+    return [m for m in cal if m["status"] == 5], [m for m in cal if m["status"] != 5]
 
 
 def main(out):
@@ -98,10 +116,10 @@ def main(out):
         "alias": p["alias"], "posicion": p["positionName"], "portero": p["isKeeper"], "capitan": p["captain"],
         "foto": p["photoUrl"], "partidos": p["played"], "goles": p["goals"], "asistencias": p["assists"],
         "amarillas": p["cardsYellow"], "rojas": p["cardsRed"],
-    } for p in team["squad"]["players"]]
-    played = team["calendar"]["played"]
-    pending = team["calendar"]["pending"]
-    matches = [match_row(m) for m in played] + [match_row(m) for m in pending]
+    } for p in squad_players(team)]
+    played, pending = split_calendar(team)
+    nombre = team["header"]["name"]
+    matches = [match_row(m, nombre) for m in played] + [match_row(m, nombre) for m in pending]
     stats = {str(m["matchId"]): player_events(m["matchId"]) for m in played}
     group = get(f"/event/standings/{EVENT_ID}/{matches_round(played, pending)}/{matches_group(played, pending)}")["groups"][0]
     standings = [{"id": t["id"], "nombre": t["name"], "pos": t["pos"], "pts": t["points"], "pj": t["played"], "g": t["won"], "e": t["drawn"],

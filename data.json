@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-24T18:44+00:00",
+ "actualizado": "2026-11-25T20:23+00:00",
  "equipo": "Truskulus FC",
  "eventoId": 302,
  "equipoId": 1092,
@@ -234,7 +234,7 @@
   {
    "matchId": 11935,
    "jornada": 2,
-   "fecha": "2026-10-18T17:45:00",
+   "fecha": "2026-10-18T00:00:00",
    "hora": "17:45:00",
    "campo": "COLEGIO JUAN PABLO II 1",
    "local": "Truskulus FC",
@@ -250,7 +250,7 @@
   {
    "matchId": 11942,
    "jornada": 3,
-   "fecha": "2026-10-25T17:00:00",
+   "fecha": "2026-10-25T00:00:00",
    "hora": "17:00:00",
    "campo": "Alfredo Cenarriaga 1",
    "local": "Birrafontana FC",
@@ -266,7 +266,7 @@
   {
    "matchId": 11949,
    "jornada": 4,
-   "fecha": "2026-11-08T16:45:00",
+   "fecha": "2026-11-08T00:00:00",
    "hora": "16:45:00",
    "campo": "COLEGIO JUAN PABLO II 1",
    "local": "Truskulus FC",
@@ -282,7 +282,7 @@
   {
    "matchId": 11956,
    "jornada": 5,
-   "fecha": "2026-11-15T16:00:00",
+   "fecha": "2026-11-15T00:00:00",
    "hora": "16:00:00",
    "campo": "Alfredo Cenarriaga 1",
    "local": "Atletico Mamanangay",
@@ -298,7 +298,7 @@
   {
    "matchId": 11963,
    "jornada": 6,
-   "fecha": "2026-11-22T19:00:00",
+   "fecha": "2026-11-22T00:00:00",
    "hora": "19:00:00",
    "campo": "Alfredo Cenarriaga 1",
    "local": "Truskulus FC",
@@ -330,7 +330,7 @@
   {
    "matchId": 11969,
    "jornada": 7,
-   "fecha": "2026-11-29T18:00:00",
+   "fecha": "2026-11-29T00:00:00",
    "hora": "18:00:00",
    "campo": "NARANJO 3B",
    "local": "Shalke Temeto",
@@ -382,7 +382,7 @@
    "hora": null,
    "campo": null,
    "local": "Truskulus FC",
-   "visitante": "Alvarez Mengibar Brokers",
+   "visitante": "Alvarez Mengibar Bro",
    "localId": 1092,
    "visitanteId": 1268,
    "esLocal": true,
@@ -558,7 +558,7 @@
    "hora": null,
    "campo": null,
    "local": "Truskulus FC",
-   "visitante": "Alvarez Mengibar Brokers",
+   "visitante": "Alvarez Mengibar Bro",
    "localId": 1092,
    "visitanteId": 1268,
    "esLocal": true,

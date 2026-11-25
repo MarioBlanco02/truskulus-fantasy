@@ -662,6 +662,9 @@ function pickSheet(i){
 /* ── Cartas: los mejores de cada jornada y el equipo de la temporada, generadas solas con las actas ── */
 const CARD_BONUS = [0.5,0.3];      // prima de valor de mercado (M€) para el 1.º y el 2.º de cada jornada
 const OVR_BASE = 80;               // media inicial de todas las cartas; sube 1 punto por cada carta conseguida
+// A mano: jornada → [carta del más votado, carta elegida por el administrador]. Úsalo cuando haya empate o se quiera decidir.
+const CARD_OVERRIDES = {6:[7060,8765]};   // J6: Adrián Carmena (más votado) y Willy
+const CARD_NUEVA_REGLA_DESDE = 6;   // antes de esta jornada se mantienen las cartas ya publicadas (los 2 con más votos y puntos)
 const CARD_MIN = 6;                // puntos mínimos de la jornada para merecer carta
 const CARDS = new Map();
 // Ediciones: se eligen solas según la fecha del partido. Todas son diseños propios.
@@ -693,13 +696,29 @@ function editionFor(j){
   if(rv&&rv.pos<=3) return EDITIONS.granduelo;                    // rival entre los 3 primeros
   return EDITIONS.if;
 }
-function bestOfRound(j){
-  if(!votesClosed(j)) return [];                 // las cartas se generan solas cuando cierra la votación
-  const tally=voteTally(j), votes=votesClosed(j)&&tally.length?new Map(tally.map(t=>[t.p.id,t.pts])):new Map();
-  const primeros=id=>VOTES.filter(v=>v.jornada===j&&v.first===id).length;       // desempate: más votos de primer puesto
+function bestOfRoundAntiguo(j){                  // regla hasta la J5: los 2 mejores por votos y, después, por puntos
+  if(!votesClosed(j)) return [];
+  const tally=voteTally(j), votes=tally.length?new Map(tally.map(t=>[t.p.id,t.pts])):new Map();
+  const primeros=id=>VOTES.filter(v=>v.jornada===j&&v.first===id).length;
   return P.map(p=>({p,x:p.log.find(l=>l.m.jornada===j),vp:votes.get(p.id)||0}))
     .filter(r=>r.x&&!r.x.lesion&&!r.x.ausente&&r.x.pts>=CARD_MIN)
     .sort((a,b)=>b.vp-a.vp||primeros(b.p.id)-primeros(a.p.id)||b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||sum(b.p.log.map(l=>l.pts))-sum(a.p.log.map(l=>l.pts))||a.p.id-b.p.id).slice(0,2);
+}
+function bestOfRound(j){
+  if(j<CARD_NUEVA_REGLA_DESDE) return bestOfRoundAntiguo(j);
+  // Carta 1: el más votado por el equipo. Carta 2: el destacado del partido por rendimiento (puntos, goles, asistencias).
+  if(!votesClosed(j)) return [];                 // las cartas se generan solas cuando cierra la votación
+  const tally=voteTally(j), votes=tally.length?new Map(tally.map(t=>[t.p.id,t.pts])):new Map();
+  const primeros=id=>VOTES.filter(v=>v.jornada===j&&v.first===id).length;       // desempate: más votos de primer puesto
+  const acum=p=>sum(p.log.map(l=>l.pts));
+  const rows=P.map(p=>({p,x:p.log.find(l=>l.m.jornada===j),vp:votes.get(p.id)||0})).filter(r=>r.x&&!r.x.lesion&&!r.x.ausente);
+  if(CARD_OVERRIDES[j]) return CARD_OVERRIDES[j].map(id=>rows.find(r=>r.p.id===id)).filter(Boolean);
+  const porRendimiento=(a,b)=>b.x.pts-a.x.pts||b.x.goles-a.x.goles||b.x.asist-a.x.asist||acum(b.p)-acum(a.p)||a.p.id-b.p.id;
+  const primero=rows.filter(r=>r.vp>0).sort((a,b)=>b.vp-a.vp||primeros(b.p.id)-primeros(a.p.id)||porRendimiento(a,b))[0]
+    ||rows.filter(r=>r.x.pts>=CARD_MIN).sort(porRendimiento)[0];
+  if(!primero) return [];
+  const segundo=rows.filter(r=>r.p.id!==primero.p.id&&r.x.pts>=CARD_MIN).sort(porRendimiento)[0];
+  return segundo?[primero,segundo]:[primero];
 }
 const seasonDone=()=>PLAYED.length>=DATA.partidos.filter(m=>!m.descansa).length;
 function bestOfSeason(force){                    // los 7 con más puntos del fantasy al acabar la temporada
@@ -836,20 +855,19 @@ function instaCaption(j){
     if(g) t.push(g===1?"marcó un gol":g===2?"firmó un doblete":g===3?"firmó un triplete":"marcó "+g+" goles");
     if(a) t.push((g?"repartió ":"dio ")+(a===1?"una asistencia":a+" asistencias"));
     if(r.x.ev.includes("MVP")) t.push("fue el MVP según la votación del equipo");
-    return (t.length?listaES(t):"cuajó un gran partido")+" y sumó "+r.x.pts+" puntos";
+    return (t.length?listaES(t)+" y sumó ":"disputó el partido y sumó ")+r.x.pts+" puntos";
   };
-  const empate=best.length>1&&best[0].x.pts===best[1].x.pts&&!voteTally(j).length;      // sin votos y a los mismos puntos: no se numera el podio
-  const premiados=best.map((r,i)=>(empate?"⭐ ":i===0?"🥇 ":"🥈 ")+r.p.full+" (media "+ovrAt(r.p,j)+"): "+desc(r)+".");
+  const premiados=best.map((r,i)=>(i===0?"🏆 ":"⭐ ")+r.p.full+" (media "+ovrAt(r.p,j)+"): "+desc(r)+"."+(i===0&&voteTally(j).length?" Más votado por el equipo.":i===1?" Destacado del partido.":""));
   const otros=rows.filter(r=>r.x.goles&&!best.some(b=>b.p.id===r.p.id)).map(r=>r.p.n+(r.x.goles>1?" ("+r.x.goles+")":""));
   const ataque=gf>0?"El equipo firmó "+goles(gf)+(otros.length?" y también "+(otros.length===1?"marcó ":"marcaron ")+listaES(otros)+".":"."):"";
   const defensa=gc===0?"Y sin encajar: portería a cero.":(gc<=2&&dif>=2)?"Además, solo "+goles(gc)+" encajados.":"";
   const tally=voteTally(j), voto=tally.length?"La votación del equipo eligió a "+tally[0].p.n+" como MVP.":"";
   const sig=UPCOMING[0], proximo=sig?"Próxima parada: Jornada "+sig.jornada+" ante "+(sig.esLocal?sig.visitante:sig.local)+", el "+dfmt(sig.fecha,{weekday:"long",day:"numeric",month:"long"}).replace(", "," ")+".":"";
-  const dos=best.length>1?"Las dos cartas de la jornada son para":"La carta de la jornada es para";
+  const dos=best.length>1?"Las dos cartas de la jornada, el más votado por el equipo y el destacado del partido:":"La carta de la jornada es para";
   const bloques=[
     em+" CARTAS "+(ed.label==="IF"?"IF":ed.label)+" · JORNADA "+j+" "+em,
     titulo+": "+marcador+".\n"+[ataque,defensa].filter(Boolean).join(" "),
-    best.length?dos+" "+listaES(best.map(r=>r.p.n))+":\n"+premiados.join("\n"):"",
+    best.length?dos+"\n"+premiados.join("\n"):"",
     [voto,proximo].filter(Boolean).join("\n"),
     "Cada jornada, los mejores del Truskulus ganan su carta y suben de media. ¿Quién será el siguiente?",
     "#TruskulusFC #LigaEliteFutbol #Futbol7 #FantasyTruskulus"
