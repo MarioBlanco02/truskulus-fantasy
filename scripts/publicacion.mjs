@@ -48,7 +48,7 @@ await browser.close();
 
 if (!resultado) { console.log("No hay cartas que publicar todavía."); process.exit(0); }
 for (const [nombre, url] of Object.entries(resultado.archivos)) fs.writeFileSync(path.join(OUT, nombre), Buffer.from(url.split(",")[1], "base64"));
-fs.writeFileSync(path.join(OUT, `texto-J${resultado.jornada}.txt`), resultado.texto);
+fs.writeFileSync(path.join(OUT, `texto-J${resultado.jornada}.txt`), resultado.texto + "\n");
 fs.writeFileSync(path.join(OUT, "jornada.txt"), String(resultado.jornada));
 fs.writeFileSync(path.join(OUT, "edicion.txt"), resultado.edicion);
 console.log(`Publicación de la jornada ${resultado.jornada} (${resultado.edicion}) → ${OUT}`);

@@ -857,11 +857,11 @@ function instaCaption(j){
     if(r.x.ev.includes("MVP")) t.push("fue el MVP según la votación del equipo");
     return (t.length?listaES(t)+" y sumó ":"disputó el partido y sumó ")+r.x.pts+" puntos";
   };
-  const premiados=best.map((r,i)=>(i===0?"🏆 ":"⭐ ")+r.p.full+" (media "+ovrAt(r.p,j)+"): "+desc(r)+"."+(i===0&&voteTally(j).length?" Más votado por el equipo.":i===1?" Destacado del partido.":""));
-  const otros=rows.filter(r=>r.x.goles&&!best.some(b=>b.p.id===r.p.id)).map(r=>r.p.n+(r.x.goles>1?" ("+r.x.goles+")":""));
+  const premiados=best.map((r,i)=>(i===0?"🏆 ":"⭐ ")+r.p.full+" (media "+ovrAt(r.p,j)+"): "+desc(r)+"."+(i===0&&voteTally(j).length&&!r.x.ev.includes("MVP")?" Más votado por el equipo.":i===1?" Destacado del partido.":""));
+  const otros=rows.filter(r=>r.x.goles&&!best.some(b=>b.p.id===r.p.id)).map(r=>(r.p.j.alias||r.p.full)+(r.x.goles>1?" ("+r.x.goles+")":""));
   const ataque=gf>0?"El equipo firmó "+goles(gf)+(otros.length?" y también "+(otros.length===1?"marcó ":"marcaron ")+listaES(otros)+".":"."):"";
   const defensa=gc===0?"Y sin encajar: portería a cero.":(gc<=2&&dif>=2)?"Además, solo "+goles(gc)+" encajados.":"";
-  const tally=voteTally(j), voto=tally.length?"La votación del equipo eligió a "+tally[0].p.n+" como MVP.":"";
+  const voto="";
   const sig=UPCOMING[0], proximo=sig?"Próxima parada: Jornada "+sig.jornada+" ante "+(sig.esLocal?sig.visitante:sig.local)+", el "+dfmt(sig.fecha,{weekday:"long",day:"numeric",month:"long"}).replace(", "," ")+".":"";
   const dos=best.length>1?"Las dos cartas de la jornada, el más votado por el equipo y el destacado del partido:":"La carta de la jornada es para";
   const bloques=[

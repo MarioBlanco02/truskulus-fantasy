@@ -40,7 +40,8 @@ jobs:
         run: |
           J=$(cat publicacion/jornada.txt); ED=$(cat publicacion/edicion.txt)
           TITLE="Publicación Instagram · Jornada $J ($ED)"
-          if [ -n "$(gh issue list --state all --search "\"$TITLE\" in:title" --json number --jq '.[0].number')" ]; then echo "Ya avisada."; exit 0; fi
+          N=$(gh issue list --state all --search "\"$TITLE\" in:title" --json number --jq '.[0].number')
+          if [ -n "$N" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then echo "Ya avisada."; exit 0; fi
           {
             echo "Las cartas de la jornada $J ya están listas para subir."
             echo
@@ -52,4 +53,4 @@ jobs:
             cat "publicacion/texto-J$J.txt"
             echo '```'
           } > cuerpo.md
-          gh issue create --title "$TITLE" --body-file cuerpo.md
+          if [ -n "$N" ]; then gh issue edit "$N" --body-file cuerpo.md; else gh issue create --title "$TITLE" --body-file cuerpo.md; fi
